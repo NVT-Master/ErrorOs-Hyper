@@ -1,0 +1,218 @@
+WORK_DIR=$(pwd)
+source $WORK_DIR/functions.sh
+
+MAIN_FOLDER="$WORK_DIR/build/baserom/images"
+FINDER="$WORK_DIR/bin/modfile/UpdateFile/Apps_Replace/find_apk_by_package.py"
+APPLIST="$WORK_DIR/bin/ddevice/DEBLOAT/APPLIST.txt"
+
+# ---------------------------------------------------------------------------
+# APPLIST.txt có hai loại dòng:
+#   - tên thư mục (cách cũ):  MIUIVideo   -> xoá mọi thư mục khớp *MIUIVideo*
+#   - "pkg:<package>"        -> tra APK theo thuộc tính package trong manifest
+#
+# Loại thứ hai mới là cách đúng: tên thư mục khác nhau giữa các ROM, và khớp
+# glob theo tên ngắn (ví dụ "ab") rất dễ xoá nhầm. pkg: khớp theo AXML nên
+# không phụ thuộc tên thư mục.
+# ---------------------------------------------------------------------------
+debloat_apps=()
+debloat_pkgs=()
+while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%$'\r'}"
+    [ -z "$line" ] && continue
+    case "$line" in \#*) continue ;; esac
+    case "$line" in
+        pkg:*) debloat_pkgs+=("${line#pkg:}") ;;
+        *)     debloat_apps+=("$line") ;;
+    esac
+done < "$APPLIST"
+
+# ---------------------------------------------------------------------------
+# Kho ứng dụng Xiaomi - tuỳ chọn, bật bằng cờ keep_getapps trong config.env.
+#
+# APPLIST debloat cả cụm kho (MIUISuperMarket / MiuiSuperMarket / MIUIMiPicks /
+# MIUISystemAppUpdater). Mất kho thì app hệ thống không có đường cập nhật nào,
+# kể cả khi máy có mạng và đã đăng nhập - đây là lỗi cấu hình, không phải lỗi
+# của Xiaomi.
+#
+# Cờ này chỉ LỌC BỎ tên khỏi danh sách vừa đọc, không sửa APPLIST.txt, nên danh
+# sách gốc vẫn là thứ duy nhất quyết định debloat mặc định.
+#
+# Vì sao cài cập nhật vẫn được dù app trong /product bị mod/ký lại: services.jar
+# đã patch matchSignaturesCompat -> 1 trong bước COREPATCH.
+# ---------------------------------------------------------------------------
+KEEP_GETAPPS=$(grep -m1 '^keep_getapps=' "$WORK_DIR/config.env" 2>/dev/null | cut -d= -f2 | tr -d '\r\n ')
+keep_apps=()
+keep_pkgs=()
+if [ "$KEEP_GETAPPS" != "false" ]; then
+    keep_apps=( MIUISuperMarket MiuiSuperMarket MIUIMiPicks MIUISystemAppUpdater )
+    keep_pkgs=( com.xiaomi.market com.xiaomi.mipicks com.miui.systemAppUpdater )
+
+    filtered_apps=()
+    for a in "${debloat_apps[@]}"; do
+        keep=false
+        for k in "${keep_apps[@]}"; do
+            [ "$a" = "$k" ] && keep=true
+        done
+        [ "$keep" = true ] && continue
+        filtered_apps+=("$a")
+    done
+
+    filtered_pkgs=()
+    for p in "${debloat_pkgs[@]}"; do
+        keep=false
+        for k in "${keep_pkgs[@]}"; do
+            [ "$p" = "$k" ] && keep=true
+        done
+        [ "$keep" = true ] && continue
+        filtered_pkgs+=("$p")
+    done
+
+    dropped=$(( ${#debloat_apps[@]} + ${#debloat_pkgs[@]} - ${#filtered_apps[@]} - ${#filtered_pkgs[@]} ))
+    debloat_apps=("${filtered_apps[@]}")
+    debloat_pkgs=("${filtered_pkgs[@]}")
+    mods "Debloat: keep_getapps=true - giữ $dropped mục kho ứng dụng (GetApps / 应用商店)"
+fi
+
+# ---------------------------------------------------------------------------
+# Trung tâm An toàn (com.miui.securitycenter) - tuỳ chọn, cờ debloat_securitycenter.
+#
+# KHÔNG đặt nó trong APPLIST: đây là app lõi của MIUI, xoá là mất rất nhiều thứ,
+# nên phải bật bằng cờ để người đọc config thấy ngay mình đang đổi cái gì.
+#
+# Đo trên máy (13.6.5-261003.0.1):
+#   - `pm disable-user` bị chặn: "Cannot disable miui core packages" - MIUI bảo
+#     vệ nó ở tầng runtime, nên chỉ xoá được lúc build (xoá thư mục trong images),
+#     không tắt được sau khi flash.
+#   - KHÔNG có cờ coreApp trong dumpsys, nên máy vẫn boot nếu thiếu (coreApp mới
+#     là thứ PMS bắt buộc phải có để boot).
+#   - 50 tham chiếu từ Settings: content://com.miui.securitycenter.provider,
+#     remoteprovider, action.ADB_INSTALL_VERIFY, WNCheckManager.
+#   - provider `authority=antispam` đang được system_server (uid 1000) giữ.
+#   - packageinstaller KHÔNG tham chiếu (đã grep dex: 0 hit) nên cài app vẫn được.
+#
+# Những gì MẤT khi xoá:
+#   icon 手机管家; quản lý quyền ứng dụng; bảo vệ quyền riêng tư; khoá app;
+#   tiết kiệm pin/Power Center; quản lý dữ liệu mạng + tường lửa; dọn rác;
+#   Game Booster; chống spam SMS; xác minh cài đặt qua ADB.
+#   Vài mục trong Cài đặt trỏ tới nó sẽ báo "không tìm thấy ứng dụng" khi bấm.
+# ---------------------------------------------------------------------------
+DEBLOAT_SECURITYCENTER=$(grep -m1 '^debloat_securitycenter=' "$WORK_DIR/config.env" 2>/dev/null | cut -d= -f2 | tr -d '\r\n ')
+if [ "$DEBLOAT_SECURITYCENTER" = "true" ]; then
+    debloat_pkgs+=("com.miui.securitycenter")
+    warn "Debloat: debloat_securitycenter=true - xoá Trung tâm An toàn (mất quyền riêng tư, pin, mạng, chống spam)"
+fi
+
+rm -rf "$MAIN_FOLDER/product/etc/auto-install"*
+rm -rf "$MAIN_FOLDER/product/app/Updater"
+# cn.google.services.xml: xoá = hệ thống không khớp chứng thư Google của GMS/Play ->
+# rủi ro hỏng Play Integrity / FCM. Giữ mặc định; chỉ xoá khi đặt
+# remove_cn_google_servicesxml=true trong config.env.
+if [ "$(grep -m1 '^remove_cn_google_servicesxml=' "$WORK_DIR/config.env" 2>/dev/null | cut -d= -f2 | tr -d '\r\n ')" = "true" ]; then
+    rm -f "$MAIN_FOLDER/product/etc/permissions/cn.google.services.xml"
+    warn "Debloat: đã xoá cn.google.services.xml theo cờ remove_cn_google_servicesxml=true"
+fi
+
+# --- 1. Debloat theo package (chính xác) -----------------------------------
+if [ "${#debloat_pkgs[@]}" -gt 0 ]; then
+    if [ -f "$FINDER" ] && [ -d "$MAIN_FOLDER" ]; then
+        pkg_csv=$(IFS=,; echo "${debloat_pkgs[*]}")
+        mods "Debloat: tra ${#debloat_pkgs[@]} package theo manifest..."
+        while IFS=$'\t' read -r pkg apk; do
+            # finder in ra "pkg\t<path>" và trên Windows kết thúc bằng \r.
+            # Không cắt \r thì apk="\r" (không rỗng), dirname "\r" = "." và
+            # rm -rf "." sẽ xoá sạch thư mục làm việc. Đã bắt được lỗi này
+            # bằng dry-run nên chặn ở đây, kèm kiểm tra đường dẫn.
+            pkg="${pkg%$'\r'}"
+            apk="${apk%$'\r'}"
+            [ -n "$pkg" ] || continue
+            if [ -z "$apk" ] || [ ! -f "$apk" ]; then
+                warn "Debloat: không thấy $pkg trong images"
+                continue
+            fi
+            dir=$(dirname "$apk")
+            case "$dir" in
+                ""|.|/|"$MAIN_FOLDER")
+                    warn "Debloat: đường dẫn bất thường cho $pkg ('$apk') - bỏ qua"
+                    continue
+                    ;;
+            esac
+            case "$(basename "$dir")" in
+                # APK nằm trực tiếp trong thư mục chứa app -> chỉ xoá APK,
+                # KHÔNG xoá thư mục mẹ (sẽ xoá cả app/ hay priv-app/).
+                app|priv-app|data-app|overlay|framework)
+                    info "Debloat: xoá APK $pkg -> $apk"
+                    rm -f "$apk"
+                    rm -rf "$dir/oat"
+                    ;;
+                *)
+                    info "Debloat: xoá thư mục $pkg -> $dir"
+                    rm -rf "$dir"
+                    ;;
+            esac
+        done < <(python3 "$FINDER" "$MAIN_FOLDER" --list "$pkg_csv" 2>/dev/null)
+    else
+        warn "Debloat: thiếu finder hoặc images - bỏ qua phần pkg:"
+    fi
+fi
+
+# --- 2. Debloat theo tên thư mục (cách cũ, giữ để tương thích) -------------
+#
+# CHỈ xoá thư mục nằm ngay trong app/ priv-app/ data-app/ overlay/. Khớp glob
+# trần "*$tên*" trên toàn bộ images thì tên ngắn ăn cả thư mục hệ thống: bản
+# OS4.0.5.0 có entry "mab" và nó khớp "*mab*" -> d/bpf/d**mab**uf, build xoá
+# luôn /system/system/etc/bpf/dmabuf. Cùng lý do, entry "Mi" sẽ khớp MiuiHome.
+# pkg: vẫn là cách đúng; nhánh này chỉ còn để tương thích APPLIST cũ.
+for debloat_app in "${debloat_apps[@]}"; do
+    [ -z "$debloat_app" ] && continue
+    all_app_dirs=$(
+        find "$MAIN_FOLDER/system" "$MAIN_FOLDER/product" "$MAIN_FOLDER/mi_ext" \
+             "$MAIN_FOLDER/system_ext" \
+             -type d -name "*$debloat_app*" \
+             \( -path '*/app/*' -o -path '*/priv-app/*' -o -path '*/data-app/*' -o -path '*/overlay/*' \) \
+             2>/dev/null
+    )
+
+    while IFS= read -r app_dir; do
+        [ -n "$app_dir" ] || continue
+        [[ -d $app_dir ]] || continue
+        # keep_getapps: nhánh này khớp glob nên entry ngắn ăn cả thư mục kho.
+        # Ví dụ entry "Updater" (com.android.updater) khớp "*Updater*" ->
+        # xoá luôn MIUISystemAppUpdater, tức bỏ đúng cái app cập nhật hệ thống.
+        # Chặn theo tên thư mục ở đây, không chỉ lọc danh sách.
+        app_name=$(basename "$app_dir")
+        kept=false
+        for k in "${keep_apps[@]}"; do
+            [ "$app_name" = "$k" ] && kept=true
+        done
+        if [ "$kept" = true ]; then
+            mods "Debloat: giữ $app_name (keep_getapps)"
+            continue
+        fi
+        case "$(basename "$(dirname "$app_dir")")" in
+            app|priv-app|data-app|overlay)
+                info "Removing directory: $app_dir"
+                rm -rf "$app_dir"
+                ;;
+            *)
+                warn "Debloat: bỏ qua '$app_dir' - thư mục mẹ không phải app/priv-app/data-app/overlay"
+                ;;
+        esac
+    done <<< "$all_app_dirs"
+done
+
+info "Debloat Done"
+
+# Xác nhận kho ứng dụng còn thật sự trong images. Nếu base ROM không có sẵn
+# GetApps thì cờ keep_getapps không tạo ra được gì - báo ngay trong log build
+# thay vì để phát hiện sau khi flash.
+if [ "$KEEP_GETAPPS" != "false" ]; then
+    store_dir=$(find "$MAIN_FOLDER/system" "$MAIN_FOLDER/product" \
+                     "$MAIN_FOLDER/system_ext" "$MAIN_FOLDER/mi_ext" \
+                     -maxdepth 4 -type d \( -name MIUISuperMarket -o -name MiuiSuperMarket -o -name MIUIMiPicks \) \
+                     2>/dev/null | head -n 1)
+    if [ -n "$store_dir" ]; then
+        mods "Debloat: kho ứng dụng còn trong ROM -> ${store_dir#$MAIN_FOLDER/}"
+    else
+        warn "Debloat: keep_getapps=true nhưng KHÔNG thấy app kho nào trong images - base ROM không kèm GetApps"
+    fi
+fi

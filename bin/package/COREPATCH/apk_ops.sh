@@ -1,0 +1,280 @@
+#!/usr/bin/env bash
+work_dir=$(pwd)
+# APK/JAR manipulation functions
+TOOLS_DIR="$work_dir/bin/apktool"
+WORK_DIR="$work_dir"
+BACKUP_DIR="$WORK_DIR/backup"
+SCRIPT_DIR="$work_dir/bin/package/COREPATCH"
+
+decompile_apk() {
+  local apk_file="$1"
+  local base_name
+  base_name="$(basename "$apk_file" .apk)"
+  local output_dir="$WORK_DIR/${base_name}_decompile"
+
+  echo "Decompiling $apk_file with apkeditor..."
+
+  # Validate apk file before processing
+  if [ ! -f "$apk_file" ]; then
+    echo "Error: apk file $apk_file not found!"
+    exit 1
+  fi
+
+  rm -rf "$output_dir"
+
+  # Run apkeditor
+  if ! java -jar "$TOOLS_DIR/apkeditor.jar" d -i "$apk_file" -o "$output_dir"; then
+    echo "Error: Failed to decompile $apk_file with apkeditor"
+    exit 1
+  fi
+}
+
+recompile_apk() {
+  local apk_file="$1"
+  local base_name
+  base_name="$(basename "$apk_file" .apk)"
+  local output_dir="$WORK_DIR/${base_name}_decompile"
+  local patched_apk="${base_name}_patched.apk"
+
+  echo "Recompiling $apk_file with apkeditor..."
+
+  # Check if decompiled directory exists
+  if [ ! -d "$output_dir" ]; then
+    echo "Error: Decompiled directory $output_dir not found!"
+    echo "This means the decompilation step failed."
+    exit 1
+  fi
+
+  java -jar "$TOOLS_DIR/redivision.jar" "$output_dir" apk
+
+  # Run apkeditor
+  if ! java -jar "$TOOLS_DIR/apkeditor.jar" b -i "$output_dir" -o "$patched_apk"; then
+    echo "Error: Failed to recompile $output_dir with apkeditor"
+    exit 1
+  fi
+}
+
+backup_original_jar() {
+  local jar_file="$1"
+  local base_name
+  base_name=$(basename "$jar_file" .jar)
+  mkdir -p "$BACKUP_DIR/$base_name"
+  # Save META-INF and res if present (silently ignore missing)
+  unzip -o "$jar_file" "META-INF/*" "res/*" -d "$BACKUP_DIR/$base_name" > /dev/null 2>&1 || true
+  # Also copy whole jar for safety
+  cp -a "$jar_file" "$BACKUP_DIR/${base_name}.orig.jar"
+  log "Backed up $jar_file -> $BACKUP_DIR/$base_name"
+}
+
+# Decompile JAR using baksmali v2
+# Uses API_LEVEL if set (e.g. API_LEVEL=33 for Android 13)
+decompile_jar() {
+  local jar_file="$1"
+  local base_name
+  base_name=$(basename "$jar_file" .jar)
+  local output_dir="${WORK_DIR}/${base_name}_decompile"
+  local api_flag=""
+  [ -n "${API_LEVEL:-}" ] && api_flag="--api $API_LEVEL"
+
+  log "Decompiling $jar_file -> $output_dir (baksmali v2)"
+
+  # Validate JAR file
+  if [ ! -f "$jar_file" ]; then
+    err "JAR file $jar_file not found!"
+    return 1
+  fi
+
+  # Check if JAR file is valid ZIP
+  if ! unzip -t "$jar_file" > /dev/null 2>&1; then
+    err "$jar_file is corrupted or not a valid ZIP file!"
+    return 1
+  fi
+
+  rm -rf "$output_dir" > /dev/null 2>&1 || true
+  mkdir -p "$output_dir"
+
+  backup_original_jar "$jar_file"
+
+  # Extract all JAR contents
+  unzip -o "$jar_file" -d "$output_dir" > /dev/null 2>&1
+
+  # Disassemble each DEX file with baksmali v2
+  for dex in "$output_dir"/*.dex; do
+    [ -f "$dex" ] || continue
+    local dex_name
+    dex_name=$(basename "$dex" .dex)
+    local smali_dir
+    if [ "$dex_name" = "classes" ]; then
+      smali_dir="$output_dir/smali"
+    else
+      # classes2 -> smali_classes2, classes3 -> smali_classes3, etc.
+      smali_dir="$output_dir/smali_${dex_name}"
+    fi
+
+    # BAKSMALI_OPTS: cờ phụ, vd "--debug-info false" (xem jar_patcher_a17.sh)
+  java -jar "${BAKSMALI_JAR:-$TOOLS_DIR/baksmaliv2.jar}" d $api_flag $BAKSMALI_OPTS "$dex" -o "$smali_dir" || {
+      err "baksmali failed to disassemble $(basename "$dex")"
+      return 1
+    }
+    # Remove original DEX after successful disassembly
+    [ -d "$smali_dir" ] && rm -f "$dex"
+  done
+
+  log "Decompile finished: $output_dir"
+
+  # Provide compatibility symlinks (classes -> smali, classesN -> smali_classesN)
+  if [ -d "$output_dir/smali" ] && [ ! -e "$output_dir/classes" ]; then
+    ln -s "smali" "$output_dir/classes" 2>/dev/null || true
+  fi
+  for n in 2 3 4 5 6 7 8 9; do
+    if [ -d "$output_dir/smali_classes${n}" ] && [ ! -e "$output_dir/classes${n}" ]; then
+      ln -s "smali_classes${n}" "$output_dir/classes${n}" 2>/dev/null || true
+    fi
+  done
+
+  echo "$output_dir"
+}
+
+# In ra cung mot file smali o cac thu muc dex KHAC (smali_classes2..).
+#
+# decompile_jar dat classes.dex -> smali/, classes2.dex -> smali_classes2/ ...
+# Nhung moi call site trong jar_patcher_*.sh deu truyen "$dir/smali/<path>".
+# Class nam o dex khac thi patch im lang khong chay - khong loi, khong canh bao,
+# chi la ROM ra khong co tac dung do. Ham nay cho cac helper trong patching.sh
+# thu tiep cac dex con lai khi duong dan goc khong ton tai.
+#
+# Chi tra ve khi duong dan TRUYEN VAO dang o dang .../smali/... . Neu file da
+# ton tai thi khong tra gi (helper dung ban goc, khong patch 2 lan).
+smali_other_variants() {
+  local file="$1" base rel d
+
+  case "$file" in
+    */smali/*) ;;
+    *) return 0 ;;
+  esac
+
+  rel="${file#*/smali/}"
+  base="${file%/smali/*}"
+  for d in "$base"/smali_classes*; do
+    [ -f "$d/$rel" ] && printf '%s\n' "$d/$rel"
+  done
+  return 0
+}
+
+# Chay lai mot ham patch tren MOI dex khac co chua file.
+#
+# Dung trong cac helper cua patching.sh: khi "$file" khong ton tai o smali/,
+# thu lai chinh ham do voi duong dan o smali_classes2/, smali_classes3/...
+# Tat ca cac ham do deu nhan duong dan file la tham so CUOI, nen chi can:
+#     smali_run_variants "patch_method_in_file" "$file" "$method" "$ret_val"
+# va ham se duoc goi lai thanh patch_method_in_file "$method" "$ret_val" "$v".
+#
+# Tra 0 neu da chay duoc it nhat 1 lan (caller return luon),
+# tra 1 neu khong co dex nao chua file (caller in canh bao nhu cu).
+smali_run_variants() {
+  local fn="$1"
+  shift
+  local file="$1"
+  shift
+  local v found=0
+
+  while IFS= read -r v; do
+    found=1
+    "$fn" "$@" "$v"
+  done < <(smali_other_variants "$file")
+
+  [ "$found" -eq 1 ]
+}
+
+# sed trên MỌI thư mục smali của một jar đã decompile.
+#
+# Vì sao cần: decompile_jar đặt classes.dex vào smali/, classes2.dex vào
+# smali_classes2/, classes3.dex vào smali_classes3/... Patch nào chỉ trỏ
+# "$dir/smali/<path>" thì:
+#   - hụt im lặng mọi class nằm trong classes2+ (không báo gì, ROM vẫn build),
+#   - hoặc in "sed: can't read ... No such file" khi class không có ở dex đầu.
+# Cả hai đều là "vá không có tác dụng" chứ không phải lỗi build.
+#
+# Dùng: sed_all_smali "$decompile_dir" 's/cu/moi/g' "com/example/Foo.smali"
+# Trả 0 nếu vá được ít nhất 1 file, 1 nếu không tìm thấy ở đâu (đã warn).
+sed_all_smali() {
+  local decompile_dir="$1" expr="$2" rel="$3"
+  local hits=0 d
+  for d in "$decompile_dir"/smali "$decompile_dir"/smali_classes*; do
+    [ -f "$d/$rel" ] || continue
+    sed -i "$expr" "$d/$rel" && hits=$((hits + 1))
+  done
+  if [ "$hits" -eq 0 ]; then
+    warn "không có $rel trong $decompile_dir - bỏ qua (class có thể đã bị gỡ ở bản ROM này)"
+    return 1
+  fi
+  return 0
+}
+
+# Recompile JAR using smali v2
+# Uses API_LEVEL if set (e.g. API_LEVEL=33 for Android 13)
+recompile_jar() {
+  local jar_file="$1" # original jar file path (used only for name)
+  local base_name
+  base_name=$(basename "$jar_file" .jar)
+  local output_dir="${WORK_DIR}/${base_name}_decompile"
+  local patched_jar="${base_name}_patched.jar"
+  local api_flag=""
+  [ -n "${API_LEVEL:-}" ] && api_flag="--api $API_LEVEL"
+
+  log "Recompiling $output_dir -> $patched_jar (smali v2)"
+  if [ ! -d "$output_dir" ]; then
+    err "Recompile failed: decompile dir not found: $output_dir"
+    return 1
+  fi
+
+  java -jar "$TOOLS_DIR/redivision.jar" "$output_dir" jar 2>/dev/null || true
+
+  # Remove compatibility symlinks before assembly
+  for link in "$output_dir/classes" "$output_dir"/classes[0-9]*; do
+    [ -L "$link" ] && rm -f "$link"
+  done
+
+  # Reassemble each smali directory -> DEX
+  for smali_dir in "$output_dir"/smali "$output_dir"/smali_classes*; do
+    [ -d "$smali_dir" ] || continue
+    local dir_name
+    dir_name=$(basename "$smali_dir")
+    local dex_name
+    if [ "$dir_name" = "smali" ]; then
+      dex_name="classes.dex"
+    else
+      # smali_classes2 -> classes2.dex
+      dex_name="${dir_name#smali_}.dex"
+    fi
+
+    java -jar "${SMALI_JAR:-$TOOLS_DIR/smaliv2.jar}" a $api_flag "$smali_dir" -o "$output_dir/$dex_name" || {
+      err "smali failed to assemble $dir_name"
+      return 1
+    }
+    # Remove smali dir after successful assembly
+    [ -f "$output_dir/$dex_name" ] && rm -rf "$smali_dir"
+  done
+
+  # Remove apktool artifacts if leftover from previous runs
+  rm -f "$output_dir/apktool.yml" 2>/dev/null || true
+
+  # Create JAR (uncompressed ZIP) - try 7z first, fall back to zip
+  rm -f "$WORK_DIR/$patched_jar" 2>/dev/null || true
+  if command -v 7z > /dev/null 2>&1; then
+    (cd "$output_dir" && 7z a -tzip -mx=0 "$WORK_DIR/$patched_jar" . > /dev/null 2>&1) || {
+      err "7z failed to create JAR archive"
+      return 1
+    }
+  else
+    (cd "$output_dir" && zip -r -0 "$WORK_DIR/$patched_jar" . > /dev/null 2>&1) || {
+      err "zip failed to create JAR archive"
+      return 1
+    }
+  fi
+
+  java -jar "$TOOLS_DIR/timestamp.jar" "$patched_jar" 1199145600
+
+  log "Created patched JAR: $patched_jar"
+  echo "$patched_jar"
+}

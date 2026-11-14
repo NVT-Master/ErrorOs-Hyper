@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Error OS - Toolbox icon cho mục Cài đặt -> Toolbox.
+  Thiết kế khớp với ic_launcher của RootToolbox.apk: nền đen bo góc,
+  cờ-lê trắng góc -45°, chấm đỏ signature (độc quyền Error OS),
+  lưới chấm PCB mờ. Kích thước 28dp giữ nguyên như drawable gốc.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="28.0dip"
+    android:height="28.0dip"
+    android:viewportWidth="512.0"
+    android:viewportHeight="512.0">
+
+    <!-- nền -->
+    <path
+        android:fillColor="#FF121214"
+        android:pathData="M128,0 L384,0 A128,128 0 0 1 512,128 L512,384 A128,128 0 0 1 384,512 L128,512 A128,128 0 0 1 0,384 L0,128 A128,128 0 0 1 128,0 Z" />
+
+    <!-- PCB dots (silk screen) -->
+    <path android:fillColor="#FF26262C" android:pathData="M72,72 m-6,0 a6,6 0 1,1 12,0 a6,6 0 1,1 -12,0 Z" />
+    <path android:fillColor="#FF26262C" android:pathData="M440,72 m-6,0 a6,6 0 1,1 12,0 a6,6 0 1,1 -12,0 Z" />
+    <path android:fillColor="#FF26262C" android:pathData="M72,440 m-6,0 a6,6 0 1,1 12,0 a6,6 0 1,1 -12,0 Z" />
+    <path android:fillColor="#FF26262C" android:pathData="M256,52 m-6,0 a6,6 0 1,1 12,0 a6,6 0 1,1 -12,0 Z" />
+    <path android:fillColor="#FF26262C" android:pathData="M52,256 m-6,0 a6,6 0 1,1 12,0 a6,6 0 1,1 -12,0 Z" />
+
+    <!-- cờ-lê, xoay -45° -->
+    <group android:pivotX="256" android:pivotY="256" android:rotation="-45">
+        <!-- đầu cờ-lê: vòng tròn -->
+        <path
+            android:fillColor="#FFF5F5F7"
+            android:pathData="M256,89 m-79,0 a79,79 0 1,1 158,0 a79,79 0 1,1 -158,0 Z" />
+        <!-- miệng cờ-lê: đa giác nền (khoét) -->
+        <path
+            android:fillColor="#FF121214"
+            android:pathData="M263,42 L382,161 L382,200 L263,135 Z" />
+        <!-- thân: thanh chữ nhật bo tròn -->
+        <path
+            android:fillColor="#FFF5F5F7"
+            android:pathData="M232,211 L280,211 A24,24 0 0 1 304,235 L304,373 A24,24 0 0 1 280,397 L232,397 A24,24 0 0 1 208,373 L208,235 A24,24 0 0 1 232,211 Z" />
+        <!-- đuôi bo tròn -->
+        <path
+            android:fillColor="#FFF5F5F7"
+            android:pathData="M256,397 m-24,0 a24,24 0 1,1 48,0 a24,24 0 1,1 -48,0 Z" />
+    </group>
+
+    <!-- chấm đỏ signature + viền nền khoét -->
+    <path
+        android:fillColor="#FF121214"
+        android:pathData="M397,397 m-47,0 a47,47 0 1,1 94,0 a47,47 0 1,1 -94,0 Z" />
+    <path
+        android:fillColor="#FFFF2D2D"
+        android:pathData="M397,397 m-27,0 a27,27 0 1,1 54,0 a27,27 0 1,1 -54,0 Z" />
+</vector>
