@@ -107,13 +107,13 @@ jobs:
           grep -n '^toolbox_mode=' config.env
 
       - name: Build ROM...
-        timeout-minutes: 90
+        timeout-minutes: 180
         env:
           INPUT_URL: ${{ inputs.input_url }}
         run: bash build.sh "$INPUT_URL" "${{ github.repository }}" "xiaomi" "${{ env.BUILDER_NAME }}" "${{ env.BUILDER_ID }}"
 
       - name: Pack ROM...
-        timeout-minutes: 40
+        timeout-minutes: 60
         run: bash packROM.sh
 
       - name: Upload ROM...

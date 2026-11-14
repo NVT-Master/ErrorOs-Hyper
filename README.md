@@ -34,17 +34,25 @@ Error OS là bản **fork lại hoàn chỉnh** của **BugOS-Hyper**, build t�
 
 ## 📦 Hỗ trợ & phạm vi
 
-ErrorOS-Hyper/Error OS **không phải trình build ROM tổng quát** — nó build **Xiaomi HyperOS** (payload/new.dat.br/super.img), patch rồi đóng gói lại chính ROM bạn đưa vào:
+ErrorOS-Hyper/Error OS **không phải trình build ROM tổng quát** — nó build **Xiaomi HyperOS** (payload/new.dat.br/super.img full OTA), patch rồi đóng gói lại chính ROM bạn đưa vào.
 
-| Thiết bị | Codename | Android | Trạng thái |
-|---|---|---|---|
-| Redmi Turbo 4 Pro / Redmi Note 15 Pro+ | `onyx` | 17 / HyperOS 4 | ✅ Build & flash OK |
-| Xiaomi HyperOS OS2–OS4 (Android 15/16/17) | nhiều codename | 15/16/17 | ⚠️ Lý thuyết — target_check có file `.env` cho A15/16/17, **chưa test ngoài onyx** |
+**Base ROM hợp lệ** (đưa vào `build.sh`):
+- Xiaomi HyperOS **OS2 / OS3 / OS4** (Android **15 / 16 / 17**) — target_check có `.env` cho cả ba mức
+- Firmware gốc Xiaomi: China / Global / EEA / India — ROM China/Global/EU đều nhận được (tự detect)
+- **Không** Android 13/14 (thiếu target `.env` cho A13/A14)
+- **Không** non-Xiaomi (Samsung, OPPO, Pixel...)
 
-- **Không** hỗ trợ Android 13/14 (chưa có `jar_patcher_a13.sh`/`a14.sh` trong repo này)
-- **Không** build non-Xiaomi/non-HyperOS (Samsung, OPPO, Pixel...)
-- Base ROM đưa vào phải là **full OTA Xiaomi** (Xiaomi CDN) — không phải ROM của hãng khác đóng gói lại
-- Trường hợp đặc biệt: `Redmi K90`, `Xiaomi 17 Series` (pudding/pandora/popsicle/nezha) được giữ nguyên brand HyperOS gốc — không rebrand Error OS cho dòng đó (theo policy `build.sh`)
+**Thiết bị:**
+Pipeline tự nhận diện codename từ base ROM và tra market name từ registry **450+ thiết bị** (`bin/ddevice/data/devices.json`, kế thừa từ BugOS-Hyper) — mọi máy Xiaomi có entry trong registry đều dùng được workflow giống nhau.
+
+| Thiết bị | Codename | Trạng thái |
+|---|---|---|
+| Redmi Turbo 4 Pro / Redmi Note 15 Pro+ | `onyx` | ✅ **Đã test & flash OK** (bản build này) |
+| Xiaomi 15 / 17, Redmi K/Note 14 series, POCO F, Mi-series... | **450+ codenames** | ⚠️ Registry có sẵn, nên build được — **chưa flash thử** |
+
+⚠️ Xiaomi 17 Series (Redmi K90 / POCO F8 Pro — `annibale`) và *(pudding/pandora/popsicle/nezha)* giữ nguyên brand HyperOS/MIUI gốc (theo policy `build.sh`) — không rebrand thành Error OS cho dòng đó.
+
+**Verified** = build thành công + flash boot được + root/Toolbox/FCM/vòng tròn tìm kiếm OK trên thiết bị thật.
 
 ## ⚙️ Build (Linux only)
 
@@ -99,12 +107,11 @@ firmware gốc Xiaomi © Xiaomi Corporation.
 
 ## English
 
-ErrorOS-Hyper rebuilds **Xiaomi HyperOS** OTA packages into a custom ROM — it is not a universal ROM builder. Scope is Xiaomi HyperOS only, Android 15/16/17 targets (A13/A14 not included), verified on **onyx** (Redmi Turbo 4 Pro, HyperOS OS4.0.2.0.XOLCNXM).
+ErrorOS-Hyper rebuilds **Xiaomi HyperOS** OTA packages into a custom ROM. Scope: Xiaomi HyperOS OS2/OS3/OS4 (Android 15/16/17), 450+ device codenames in `devices.json` (inherited from BugOS-Hyper), auto-detected from the base ROM. Android 13/14 not included. Verified (build+flash+boot) only on **onyx** (Redmi Turbo 4 Pro / Redmi Note 15 Pro+, HyperOS OS4.0.2.0.XOLCNXM).
 
-- Build pipeline only (no prebuilt ROMs in git)
+- Not a universal ROM builder; Xiaomi HyperOS only
 - Arch Linux only
 - GMS kept, FCM delivery fixed for Android 17, Circle-to-Search & Gemini retained
-- Other devices/ROMs may build in theory but are untested
 - Not an official Xiaomi / Nothing / Google product; flash at your own risk
 
 See **Build** section above. Arch Linux only.
