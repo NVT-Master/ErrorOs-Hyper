@@ -1,0 +1,93 @@
+name: Telegram Build Watcher
+
+on:
+  schedule:
+    # Chạy mỗi 10 phút. GitHub cron có thể trễ vài phút, miễn là đủ nhanh cho CI build 2h.
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    permissions:
+      # Cần quyền để trigger workflow build qua API
+      actions: write
+      contents: read
+
+    steps:
+      - name: Install deps
+        run: pacman -Syu --noconfirm --needed python python-requests
+
+      - name: Check Telegram messages
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          # ID của bạn (owner duy nhất được trigger /build)
+          AUTHORIZED_IDS: '7692468306'
+        run: |
+          python3 - <<'PY'
+          import json, os, sys, urllib.request, urllib.parse
+
+          BOT_TOKEN = os.environ['TELEGRAM_BOT_TOKEN']
+          GH_TOKEN = os.environ['GITHUB_TOKEN']
+          REPO = os.environ['GITHUB_REPOSITORY']
+          AUTHORIZED_IDS = set(os.environ.get('AUTHORIZED_IDS', '').split(','))
+
+          def tg(url, params=None):
+              if params is None:
+                  params = {}
+              req = urllib.request.Request(
+                  f'https://api.telegram.org/bot{BOT_TOKEN}/{url}',
+                  data=json.dumps(params).encode(),
+                  headers={'Content-Type': 'application/json'})
+              return json.loads(urllib.request.urlopen(req, timeout=25).read())
+
+          result = tg('getUpdates', {'timeout': 10, 'limit': 100})
+          triggered = []
+
+          for upd in result.get('result', []):
+              msg = upd.get('message')
+              if not msg:
+                  continue
+              text = (msg.get('text') or '').strip()
+              user = msg.get('from', {})
+              uid = str(user.get('id', ''))
+              ok = uid in AUTHORIZED_IDS
+              print(f'update_id={upd.get("update_id")} user={uid} text={text!r} allowed={ok}')
+              if not ok or not text.startswith('/build'):
+                  continue
+
+              parts = text.split()
+              mode = parts[1] if len(parts) > 1 else 'root'
+              if mode not in ('root', 'kaorios'):
+                  mode = 'root'
+
+              url = 'https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS4.0.2.0.XOLCNXM/onyx-ota_full-OS4.0.2.0.XOLCNXM-user-17.0-dbe344d29d.zip'
+              payload = {'ref': 'main', 'inputs': {'input_url': url, 'toolbox_mode': mode}}
+              req = urllib.request.Request(
+                  f'https://api.github.com/repos/{REPO}/actions/workflows/build.yml/dispatches',
+                  data=json.dumps(payload).encode(),
+                  headers={'Accept': 'application/vnd.github+json',
+                           'Authorization': f'Bearer {GH_TOKEN}',
+                           'Content-Type': 'application/json'},
+                  method='POST')
+              urllib.request.urlopen(req, timeout=25)
+              triggered.append((uid, mode))
+              print(f'✅ dispatched build mode={mode} for user={uid}')
+
+          # Xoá updates đã xử lý để tránh trigger trùng
+          if result.get('result'):
+              last_id = max(u['update_id'] for u in result['result'])
+              tg('getUpdates', {'offset': last_id + 1, 'timeout': 0})
+              print(f'cleared up to update_id={last_id}')
+
+          if triggered:
+              # Thông báo vào nhóm luôn
+              msgs = [f'🚀 Build triggered by /build {m}' for _, m in triggered]
+              # Gửi vào từng chat đã có message
+              seen_chats = {u['message']['chat']['id'] for u in result.get('result', []) if 'message' in u}
+              for cid in seen_chats:
+                  tg('sendMessage', {'chat_id': cid, 'text': '\n'.join(msgs)})
+PY
