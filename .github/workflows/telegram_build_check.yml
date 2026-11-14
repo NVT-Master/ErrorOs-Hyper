@@ -90,4 +90,4 @@ jobs:
               seen_chats = {u['message']['chat']['id'] for u in result.get('result', []) if 'message' in u}
               for cid in seen_chats:
                   tg('sendMessage', {'chat_id': cid, 'text': '\n'.join(msgs)})
-PY
+          PY
