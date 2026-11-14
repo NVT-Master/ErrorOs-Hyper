@@ -105,7 +105,8 @@ mods "OS version hiển thị: ${rom_version_display}  <- ${rom_version_src}"
 # Phần đầu (4.0.5.0) lấy từ chính tên ROM, nên bản sau tự đổi theo.
 # KHÔNG đụng ro.mi.os.version.incremental / ro.build.version.incremental:
 # ro.build.fingerprint được init ghép từ prop sau, sửa vào là hỏng định dạng.
-# Giá trị chỉ đi qua prop riêng ro.erroros.osversioncode + patch smali.
+# Dòng Info (nhỏ dưới logo): "Error OS 1.1 | @NVT-Master" — cố định mọi base ROM.
+# Dòng tên version lớn dùng ro.mi.os.version.incremental = ${rom_version_name} (dynamic).
 # ---------------------------------------------------------------------------
 rom_version_core=$(printf '%s\n' "$rom_version_short" | awk -F. -v OFS=. '{ if (NF > 4) NF = 4; print }')
 case "$regionTYPE" in
@@ -115,7 +116,7 @@ case "$regionTYPE" in
 esac
 # dd/mm/yy - cùng nguồn ngày với build_date bên dưới, chỉ khác thứ tự
 build_ddmmyy=$(TZ=Asia/Ho_Chi_Minh date +"%d%m%y")
-rom_version_code="OS${rom_version_core}.${osver_region}${build_ddmmyy}"
+rom_version_code="Error OS 1.1 | @NVT-Master"
 mods "OS version (dòng Phiên bản OS): ${rom_version_code}"
 
 # brand_incremental=false (mặc định): KHÔNG gắn " | Error OS" vào
