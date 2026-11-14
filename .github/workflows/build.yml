@@ -34,16 +34,10 @@ jobs:
           pacman -Scc --noconfirm || true
           df -h /
 
-      - name: Maximize build space
-        uses: easimon/maximize-build-space@master
-        with:
-          swap-size-mb: 1024
-          root-reserve-mb: 6144
-          remove-dotnet: 'true'
-          remove-android: 'true'
-          remove-haskell: 'true'
-          remove-codeql: 'true'
-          remove-docker-images: 'true'
+      - name: Free runner space
+        run: |
+          rm -rf /opt/ghc /usr/share/swift /usr/local/share/boost /opt/microsoft /usr/local/.ghcup /usr/lib/mono || true
+          df -h /
 
       - name: Checkout repository
         uses: actions/checkout@main
@@ -206,14 +200,14 @@ jobs:
         if: success()
         continue-on-error: true
         run: |
-          pacman -S --noconfirm --needed python-pip && python3 -m pip install requests
+          pacman -S --noconfirm --needed python-requests
           python notify.py success "${{ github.repository }}" "${{ inputs.input_url }}" "xiaomi" "${{ env.BUILDER_NAME }}" "${{ env.BUILDER_ID }}"
 
       - name: Failure Notification
         if: failure()
         continue-on-error: true
         run: |
-          pacman -S --noconfirm --needed python-pip && python3 -m pip install requests
+          pacman -S --noconfirm --needed python-requests
           python notify.py fail "${{ github.repository }}" "${{ inputs.input_url }}" "xiaomi" "${{ env.BUILDER_NAME }}" "${{ env.BUILDER_ID }}"
 
       - name: Cleanup
