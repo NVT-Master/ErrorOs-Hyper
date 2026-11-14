@@ -28,7 +28,7 @@ jobs:
     steps:
       - name: Free runner space + pacman base
         run: |
-          pacman -Sy --noconfirm --needed git tar sudo ca-certificates
+          pacman -Syu --noconfirm --needed git tar sudo ca-certificates
           rm -rf /usr/share/dotnet /opt/ghc /opt/microsoft /usr/local/.ghcup \
                  /usr/lib/mono /opt/az /usr/share/swift /usr/local/share/boost || true
           pacman -Scc --noconfirm || true
@@ -206,14 +206,14 @@ jobs:
         if: success()
         continue-on-error: true
         run: |
-          pip install requests
+          pacman -S --noconfirm --needed python-pip && python3 -m pip install requests
           python notify.py success "${{ github.repository }}" "${{ inputs.input_url }}" "xiaomi" "${{ env.BUILDER_NAME }}" "${{ env.BUILDER_ID }}"
 
       - name: Failure Notification
         if: failure()
         continue-on-error: true
         run: |
-          pip install requests
+          pacman -S --noconfirm --needed python-pip && python3 -m pip install requests
           python notify.py fail "${{ github.repository }}" "${{ inputs.input_url }}" "xiaomi" "${{ env.BUILDER_NAME }}" "${{ env.BUILDER_ID }}"
 
       - name: Cleanup
