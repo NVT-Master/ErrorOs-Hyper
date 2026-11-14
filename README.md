@@ -13,7 +13,7 @@ _Transform official Xiaomi HyperOS China firmware into Error OS — with pixel-p
 
 ---
 
-*Giải nén payload Xiaomi → sửa → repack → flash. Windows không chạy được.*
+*Build một Xiaomi HyperOS base vào ROM tuỳ chỉnh — không phải ROM tổng quát. Windows không chạy được.*
 
 </div>
 
@@ -32,13 +32,19 @@ Error OS là bản **fork lại hoàn chỉnh** của **BugOS-Hyper**, build t�
 | 🚀 **Root (tuỳ chọn)** | SukiSU Ultra (LKM) — bật trong `config.env`: `sukisu=true` |
 | 🇻🇳 **Tiếng Việt** | Overlay Tiếng Việt cho app Xiaomi (bộ ZK Multi, đóng gói `ErrorOS.Multi.*`) |
 
-## 📦 Hỗ trợ thiết bị
+## 📦 Hỗ trợ & phạm vi
 
-| Thiết bị | Codename | Android | Base | Trạng thái |
-|---|---|---|---|---|
-| Redmi Turbo 4 Pro | `onyx` | 17 / HyperOS 4 | OS4.0.2.0.XOLCNXM | ✅ Build & flash OK |
+ErrorOS-Hyper/Error OS **không phải trình build ROM tổng quát** — nó build **Xiaomi HyperOS** (payload/new.dat.br/super.img), patch rồi đóng gói lại chính ROM bạn đưa vào:
 
-> ROM khác thiết bị khác cần tree/device riêng — chưa hỗ trợ.
+| Thiết bị | Codename | Android | Trạng thái |
+|---|---|---|---|
+| Redmi Turbo 4 Pro / Redmi Note 15 Pro+ | `onyx` | 17 / HyperOS 4 | ✅ Build & flash OK |
+| Xiaomi HyperOS OS2–OS4 (Android 15/16/17) | nhiều codename | 15/16/17 | ⚠️ Lý thuyết — target_check có file `.env` cho A15/16/17, **chưa test ngoài onyx** |
+
+- **Không** hỗ trợ Android 13/14 (chưa có `jar_patcher_a13.sh`/`a14.sh` trong repo này)
+- **Không** build non-Xiaomi/non-HyperOS (Samsung, OPPO, Pixel...)
+- Base ROM đưa vào phải là **full OTA Xiaomi** (Xiaomi CDN) — không phải ROM của hãng khác đóng gói lại
+- Trường hợp đặc biệt: `Redmi K90`, `Xiaomi 17 Series` (pudding/pandora/popsicle/nezha) được giữ nguyên brand HyperOS gốc — không rebrand Error OS cho dòng đó (theo policy `build.sh`)
 
 ## ⚙️ Build (Linux only)
 
@@ -93,12 +99,12 @@ firmware gốc Xiaomi © Xiaomi Corporation.
 
 ## English
 
-ErrorOS-Hyper = full custom ROM build for **Xiaomi HyperOS (onyx)**, forked from **BugOS-Hyper**,
-rebranded/fixed as **Error OS** (Xiaomi China `OS4.0.2.0.XOLCNXM`, Android 17 base, unmodified GMS).
+ErrorOS-Hyper rebuilds **Xiaomi HyperOS** OTA packages into a custom ROM — it is not a universal ROM builder. Scope is Xiaomi HyperOS only, Android 15/16/17 targets (A13/A14 not included), verified on **onyx** (Redmi Turbo 4 Pro, HyperOS OS4.0.2.0.XOLCNXM).
 
 - Build pipeline only (no prebuilt ROMs in git)
 - Arch Linux only
 - GMS kept, FCM delivery fixed for Android 17, Circle-to-Search & Gemini retained
+- Other devices/ROMs may build in theory but are untested
 - Not an official Xiaomi / Nothing / Google product; flash at your own risk
 
 See **Build** section above. Arch Linux only.
