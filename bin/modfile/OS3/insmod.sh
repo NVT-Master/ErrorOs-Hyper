@@ -21,7 +21,7 @@ find "$TARGET_DIR" -type f -name "*.sh" | sort | while read -r script; do
     done
 
     if [[ $skip == false ]]; then
-        bash "$script"
+        bash "$script" < /dev/null
     fi
 done
 fi
