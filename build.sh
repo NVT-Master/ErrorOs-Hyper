@@ -29,9 +29,9 @@ fi
 
 # Fix lỗi cấu hình gói apt/dpkg và cài đặt các phụ thuộc cần thiết
 sudo dpkg --configure -a 2>/dev/null || true
-sudo pacman -S --noconfirm --needed xmlstarlet aapt erofs-utils e2fsprogs brotli zstd bc
+sudo pacman -S --noconfirm --needed xmlstarlet erofs-utils e2fsprogs brotli zstd bc
 
-check unzip aria2c 7z zip java python3 zstd bc xmlstarlet aapt
+check unzip aria2c 7z zip java python3 zstd bc xmlstarlet
 
 # Dọn dẹp môi trường trước khi build
 rm -rf $work_dir/out

@@ -6,7 +6,7 @@ set -euo pipefail
 echo "[setup] Arch Linux - cài phụ thuộc qua pacman"
 sudo pacman -Sy --noconfirm --needed \
     git aria2 jq rclone python python-pip wget lz4 xz zstd bc zip unzip 7zip \
-    xmlstarlet aapt erofs-utils e2fsprogs device-tree-compiler zlib glibc libstdc++ \
+    xmlstarlet erofs-utils e2fsprogs dtc zlib glibc libstdc++ \
     gcc java-runtime-headless android-tools
 pip3 install --no-cache-dir ConfigObj telebot setuptools || true
 
