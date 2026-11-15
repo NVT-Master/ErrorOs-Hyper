@@ -1,25 +1,22 @@
-
 #!/bin/bash
-echo "Welcome to Error OS Fastboot ROM Installer for macOS"
+echo "Chao mung den voi Error OS Flash Tool for macOS"
 cd "$(dirname "$0")" || exit 1
 
-# Define commands
 FASTBOOT="fastboot"
 
 if ! command -v $FASTBOOT >/dev/null 2>&1; then
-    # Check if bundled fastboot exists
     if [ -x "META-INF/bin/fastboot_mac" ]; then
         FASTBOOT="META-INF/bin/fastboot_mac"
     elif [ -x "META-INF/bin/fastboot" ]; then
         FASTBOOT="META-INF/bin/fastboot"
     else
-        echo "fastboot not found. Attempting to install via brew..."
+        echo "Khong tim thay fastboot. Dang cai brew..."
         brew install android-platform-tools
         if command -v fastboot >/dev/null 2>&1; then
             FASTBOOT="fastboot"
         else
-            echo "Failed to install fastboot. Please install it manually."
-            read -r -p "Press Enter to exit..."
+            echo "Cài fastboot thất bại."
+            read -r -p "Nhấn Enter để thoát..."
             exit 1
         fi
     fi
@@ -28,30 +25,29 @@ fi
 DeviceCodeRom=$(cat META-INF/Data/DeviceCode 2>/dev/null | tr -d '\r\n')
 
 echo ""
-echo "[i] - Read this information before flashing"
+echo "[i] - Doc thong tin truoc khi flash"
 echo ""
-echo "1. Our ROM, like most other custom ROMS, requires an unlocked bootloader! If your device is NOT, please close this window."
-echo "2. You have to choose carefully else you will LOST ALL DATA!"
-echo "3. THIS IS A FREE ROM!!! If you see someone sell or install this ROM for fees, please CONTACT ADMIN NOW."
-echo "4. We will NOT take responsibility if you brick your phone or lose all data while installing this ROM."
-echo "5. Make sure you have downloaded the exact build for your device, else you might get bricked."
+echo "1. ROM nay can bootloader da unlock! Neu chua, vui long dong cua so nay lai."
+echo "2. Flash ROM se MAT TOAN BO DU LIEU! Kiem tra ky truoc khi bam."
+echo "3. Day la ROM FREE! Neu ban thay ai ban ROM nay, hay bao admin ngay."
+echo "4. Chung toi KHONG chiu trach nhiem neu may ban bi loi/brick sau khi flash."
+echo "5. Bam dung ROM cua may ban - sai se brick."
 echo ""
-echo "[i] - If you have read and agreed to all of the above, press Enter to start the installation."
-echo "[i] - Else, close this terminal window."
+echo "[i] - Nhan Enter de bat dau. Hoac dong terminal nay."
 read -r -p ""
 
 echo "========================================================================================="
-echo " Please Choose Format Option Before Flash ROM"
+echo " Chon che do format truoc khi flash"
 echo ""
-echo "   y = Format All Data(Clean Flash)         "
-echo "   n = Keep Data And Document(Dirty Flash)"
+echo "   y = Format toan bo Data (Flash sach - mat het du lieu)         "
+echo "   n = Giu du lieu (Dirty flash - khong mat du lieu)"
 echo ""
 echo "========================================================================================="
-read -r -p "Your choice {y/n}: " CHOICE
+read -r -p "Lua chon cua ban {y/n}: " CHOICE
 echo "========================================================================================="
-echo "Make Sure Your Devices Is On Fastboot Mode"
-echo "If It Still Not Detect Please Install Driver"
-echo "And Try Again..."
+echo "Ket noi dien thoai vao Mac + boot vao Fastboot mode"
+echo "Neu khong nhan thay may - bam nut tang/giam am luong de fastboot reload"
+echo "Va cai lai driver"
 echo "========================================================================================="
 
 DeviceCodeReal=$($FASTBOOT getvar product 2>&1 | grep -i "product:" | awk '{print $2}' | tr -d '\r\n')
@@ -67,11 +63,10 @@ if [ "$DeviceCodeReal" = "mars" ]; then
     DeviceCodeReal="star"
 fi
 
-# Check DeviceCode Match
 if [[ "$DeviceCodeReal" != *"$DeviceCodeRom"* ]]; then
-    echo "Device Code Mismatch!"
-    echo "Device codename does not match, your device is \"$DeviceCodeReal\". This rom file is for \"$DeviceCodeRom\"."
-    read -r -p "Press Enter to exit..."
+    echo "LOI: May dich khac muc ROM nay!"
+    echo "May ban la \"$DeviceCodeReal\".  ROM nay cho \"$DeviceCodeRom\"."
+    read -r -p "Nhan Enter de thoat..."
     exit 1
 fi
 
@@ -79,16 +74,16 @@ for f in *.img.zst; do
     [ -e "$f" ] || continue
     par="${f%.img.zst}"
     rm -f "${par}.img" 2>/dev/null
-    echo "  Extract ${par} ..."
+    echo "  Dang giai nen ${par} ..."
     if command -v zstd >/dev/null 2>&1; then
         zstd -d "$f" -o "${par}.img"
     else
-        echo "zstd not found. Attempting to install via brew..."
+        echo "Khong thay zstd. Dang cai brew..."
         brew install zstd
         if command -v zstd >/dev/null 2>&1; then
             zstd -d "$f" -o "${par}.img"
         else
-            echo "Failed to install zstd. Please install it manually."
+            echo "Khong cai zstd."
             exit 1
         fi
     fi
@@ -130,16 +125,16 @@ if [ -f "super.img" ]; then
 fi
 
 if [ "$CHOICE" = "y" ] || [ "$CHOICE" = "Y" ]; then
-    echo "  Formatting..."
+    echo "  Dang format toan bo Data... (5-10 phut)"
     $FASTBOOT erase frp >/dev/null 2>&1
     $FASTBOOT erase userdata >/dev/null 2>&1
     $FASTBOOT erase metadata >/dev/null 2>&1
+    echo "  Xong format."
     echo ""
 fi
 
-echo "  All done,Your Devices Is Automatic Restart..."
-echo "  Now Wait For 10-15 Min For Booting"
-echo "  "
+echo "  Done. May se tu khoi dong lai sau giay phut..."
+echo "  Lan dau boot co the mat 10-30 phut"
 echo ""
 
 if [ "$fqlx" = "AB" ]; then
@@ -147,5 +142,5 @@ if [ "$fqlx" = "AB" ]; then
 fi
 $FASTBOOT reboot
 
-read -r -p "Press Enter to exit..."
+read -r -p "Nhan Enter de thoat..."
 exit 0

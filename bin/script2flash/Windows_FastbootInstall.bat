@@ -1,32 +1,32 @@
 @echo off&setlocal enabledelayedexpansion
-title Welcome to Classic ROM Installer
+title Chao mung den voi Error OS Flash Tool
 cd %~dp0
 set fastboot=META-INF\fastboot
 set /p DeviceCodeRom=<META-INF\Data\DeviceCode
 echo.
-echo.[i] - Read this information before flashing
+echo.[i] - Doc thong tin truoc khi flash
 echo.
-echo.1. Our ROM,like most other custom ROMS,requires an unlocked bootloader!If your device is NOT,please close this window.
-echo.2. You have to choose carefully else you will LOST ALL DATA!
-echo.3. THIS IS A FREE ROM!!!If you see someone sell or install this ROM for fees,please CONTACT ADMIN NOW.
-echo.4. We will NOT take responsibility if you brick your phone or lose all data while installing this ROM.
-echo.5. Make sure you have downloaded the exact build for your device, else you might get bricked.
-
-echo.[i] - If you have read and agreed to all of the above,press any key to start the installation.
-echo.[i] - Else, exit this window.
+echo.1. ROM nay can bootloader da unlock! Neu chua, vui long dong cua so nay lai.
+echo.2. Flash ROM se MAT TOAN BO DU LIEU! Kiem tra ky truoc khi bam.
+echo.3. Day la ROM FREE! Neu ban thay ai ban ROM nay, hay bao admin ngay.
+echo.4. Chung toi KHONG chiu trach nhiem neu may ban bi loi/brick sau khi flash.
+echo.5. Bam dung ROM cua may ban - sai se brick.
+echo.
+echo.[i] - Neu ban da hieu, nhan phim bat ky de vao tool.
+echo.[i] - Neu khong thi dong cua so nay.
 pause >NUL 2>NUL
 echo.=========================================================================================
-echo. Please Choose Format Option Before Flash ROM
+echo. Chon che do format truoc khi flash
 echo.
-echo.   y = Format All Data(Clean Flash)         
-echo.   n = Keep Data And Document(Dirty Flash)
+echo.   y = Format toan bo Data (Flash sach - mat het du lieu)
+echo.   n = Giu du lieu (Dirty flash - khong mat du lieu)
 echo.
 echo.=========================================================================================
-set /p CHOICE="Your choice {y/n}: "
+set /p CHOICE="Lua chon cua ban {y/n}: "
 echo.=========================================================================================
-echo.Make Sure Your Devices Is On Fastboot Mode
-echo.If It Still Not Detect Please Install Driver
-echo.And Try Again...
+echo.Ket noi dien thoai vao PC + boot vao Fastboot mode
+echo.Neu khong nhan thay may - bam nut tang/giam am luong de fastboot reload
+echo.Va cai lai driver
 echo.=========================================================================================
 
 for /f "tokens=2" %%a in ('!fastboot! getvar product 2^>^&1 ^| findstr /l /b /c:"product:"') do set DeviceCodeReal=%%a
@@ -36,16 +36,15 @@ if "!fqlx!" == "2" (set fqlx=AB)  else (set fqlx=A)
 if "!DeviceCodeReal!" == "mars" set DeviceCodeReal=star
 
 echo !DeviceCodeReal! | findstr /b /c:"!DeviceCodeRom!"  >nul 2>nul 
-
 if errorlevel 1 (
-    title Device Code Mismatch! & echo. Device codename does not match, your device is "!DeviceCodeReal!". This rom file is for "!DeviceCodeRom!". & pause & exit /B 1
+    title Loi: May dich khac ROM! & echo. May ban la "!DeviceCodeReal!".  ROM nay cho "!DeviceCodeRom!". & pause & exit /B 1
 )
 
 for /f %%i in ('dir /b *.img.zst') do (
  	set par=%%i
  	set par=!par:.img.zst=!
  	del /s /q !par!.img >nul 2>nul 
- 	echo.  Extract !par! ...
+ 	echo.  Dang giai nen !par! ...
    	META-INF\zstd -d !par!.img.zst -o !par!.img
 )
 
@@ -72,18 +71,17 @@ if exist super.img (
         del /s /q super.img >nul 2>nul 
 )
 
-
 if /I "%CHOICE%" == "y" (
-	echo.  Formatting...
+	echo.  Dang format toan bo Data... (5-10 phut, may se dung hoai)
 	!fastboot! erase frp  >NUL 2>NUL
 	!fastboot! erase userdata  >NUL 2>NUL
         !fastboot! erase metadata  >NUL 2>NUL
 	echo.
 )
 
-echo.  All done,Your Devices Is Automatic Restart...
-echo.  Now Wait For 10-15 Min For Booting
-echo.  
+echo.  Done. May se tu khoi dong lai sau giay phut...
+echo.  Lan dau boot co the mat 10-30 phut (toi uu he thong)
+echo.  Dung dung lai may trong qua trinh nay
 echo.
 if !fqlx! == AB (!fastboot! set_active a  >NUL 2>NUL)
 !fastboot! reboot 
