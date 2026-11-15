@@ -402,6 +402,26 @@ patch_settings_apk() {
     aspect=$(aspect_of "$SRC_DIR/ic_hyper_os.xml")
     mods "Settings: Wordmark aspect: $aspect"
 
+    # ---- About: About logo to ~+20% --------------------------------------
+    local hf
+    for hf in "$out"/resources/*/res/values*/dimens.xml; do
+        [ -f "$hf" ] || continue
+        if grep -q 'name="my_device_os_logo_width"' "$hf" 2>/dev/null; then
+            python3 - "$hf" << 'PY'
+import sys
+f = sys.argv[1]
+s = open(f, encoding='utf-8').read()
+s2 = s.replace('<dimen name="my_device_os_logo_width">280.0dp</dimen>',
+               '<dimen name="my_device_os_logo_width">336.0dp</dimen>')
+s2 = s2.replace('<dimen name="my_device_os_logo_height">94.0dp</dimen>',
+                '<dimen name="my_device_os_logo_height">113.0dp</dimen>')
+if s2 != s:
+    open(f, 'w', encoding='utf-8').write(s2)
+PY
+            mods "Settings: About logo bumped to 336x113dp"
+        fi
+    done
+
     local total=0
     local strings_done=0
     local png_used=0
