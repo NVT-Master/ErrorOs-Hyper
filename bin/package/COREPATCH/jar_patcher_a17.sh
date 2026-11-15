@@ -1134,44 +1134,39 @@ if MARK in s:
     print("da va roi")
     sys.exit(0)
 
-AT = r"invoke-virtual \{([vp]\d+), ([vp]\d+)\}, Landroid/app/Application;->attach\(Landroid/content/Context;\)V"
+pat = re.compile(r"(?m)^(\.method public [^\n]*newApplication[^\n]*\n)(.*?\.end method)", re.S)
 
-def add_hook(m):
-    ctx = m.group(2)
-    return (m.group(0)
-            + "\n\n    invoke-static {%s}, Lcom/erroros/spoof/AppSpoof;->apply(Landroid/content/Context;)V"
-              "\n\n    # %s" % (ctx, MARK))
+def context_register(params, sig):
+    tokens = re.findall(r"(?:\[?Landroid/content/Context;|\[?L[^\s,);]+;|[ZBCDFIJS])", params)
+    idx = None
+    for i, t in enumerate(tokens):
+        if t == "Landroid/content/Context;":
+            idx = i
+            break
+    if idx is None:
+        return None
+    is_static = " static " in " " + sig
+    return ("p%d" % idx) if is_static else ("p%d" % (idx + 1))
 
-pat = re.compile(r"\.method public (?:static )?newApplication\([^\n]*\n(.*?)\.end method", re.S)
-total = 0
+total = [0]
 
 def fix_method(m):
-    global total
-    body = m.group(1)
-    if "Application;->attach(Landroid/content/Context;)V" not in body:
+    sig, body = m.group(1), m.group(2)
+    pm = re.search(r"\(([^)]*)\)", sig)
+    ctx = context_register(pm.group(1), sig)
+    if ctx is None:
         return m.group(0)
-    new_body, k = re.subn(AT, add_hook, body, count=1)
-    if k:
-        total += k
-    return m.group(0).replace(body, new_body, 1)
+    rm = re.search(r"\n(\s*)return-object [^\n]*\n", body)
+    if not rm:
+        return m.group(0)
+    indent = rm.group(1)
+    total[0] += 1
+    hook = "\n" + indent + "invoke-static {%s}, Lcom/erroros/spoof/AppSpoof;->apply(Landroid/content/Context;)V\n    # " % ctx + MARK + "\n"
+    return sig + body[:rm.start()] + hook + body[rm.start():]
 
 s2 = pat.sub(fix_method, s)
-
-if total == 0:
-    # Android 16/17: attach co the o trong mn hoac method wrapper khong khop ->
-    # fallback file-scope (attach chi xuat hien 1 lan trong Instrumentation.smali).
-    s2, k = AT.subn(add_hook, s, count=1)
-    if k:
-        total += k
-        print("fallback: hook attach o ngoai newApplication khop")
-    else:
-        print("---- diagnostics: dong chua 'attach' ----")
-        for line in s.splitlines():
-            if "attach" in line:
-                print(line)
-
 open(path, "w", encoding="utf-8", newline="\n").write(s2)
-print("va %d newApplication" % total)
+print("va %d newApplication" % total[0])
 PYEOF
     if grep -q "erroros_appspoof" "$instr" 2>/dev/null; then
       log "AppSpoof: Instrumentation.newApplication -> gọi AppSpoof.apply(Context)"
