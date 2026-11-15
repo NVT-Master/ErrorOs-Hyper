@@ -116,7 +116,7 @@ recompile_jar() {
     fi
     rm -f "$JAR_TMP/${JAR_NAME}_notal" "$JAR_TMP/$JAR_NAME"
     7za a -tzip -mx=0 "$JAR_TMP/${JAR_NAME}_notal" "$JAR_OUT/." >/dev/null 2>&1
-    zipalign 4 "$JAR_TMP/${JAR_NAME}_notal" "$JAR_TMP/$JAR_NAME"
+    if command -v zipalign >/dev/null 2>&1; then`n        zipalign 4 "$JAR_TMP/${JAR_NAME}_notal" "$JAR_TMP/$JAR_NAME"`n    else`n        cp -f "$JAR_TMP/${JAR_NAME}_notal" "$JAR_TMP/$JAR_NAME"`n    fi
     cd "$work_dir"
     [[ -f "$JAR_TMP/$JAR_NAME" ]] || return 1
     sudo cp -rf "$JAR_TMP/$JAR_NAME" "$JAR_SRC"

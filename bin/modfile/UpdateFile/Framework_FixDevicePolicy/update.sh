@@ -58,7 +58,11 @@ jar_util()
                     fi
                 done
                 7za a -tzip -mx=0 $work_dir/jar_temp/$2_notal $work_dir/jar_temp/$2.out/. >/dev/null 2>&1
-                zipalign 4 $work_dir/jar_temp/$2_notal $work_dir/jar_temp/$2
+                if command -v zipalign >/dev/null 2>&1; then
+                    zipalign 4 $work_dir/jar_temp/$2_notal $work_dir/jar_temp/$2
+                else
+                    cp -f $work_dir/jar_temp/$2_notal $work_dir/jar_temp/$2
+                fi
                 if [[ -f $work_dir/jar_temp/$2 ]]; then
                     sudo cp -rf $work_dir/jar_temp/$2 $work_dir/build/baserom/images/system_ext/framework/miui-services.jar
                     final_dir="$work_dir/module/*"

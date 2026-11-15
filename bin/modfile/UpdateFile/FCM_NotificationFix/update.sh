@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # ---------------------------------------------------------------------------
 # FCM push notification fix for HyperOS China ROMs
 #
@@ -126,7 +126,11 @@ rm -rf "$OUT"
 mkdir -p "$OUT"
 
 mods "FCM: đang patch (SDK $SDK, China)..."
-java -noverify -cp "$ENGINE" com.hyperos.fcm.patcher.Main \
+# JDK 17: -noverify da bi go ra khoi JVM hien dai (JDK 21+) - engine dex2jar
+# can -noverify de load (khong co stack map frames).
+JAVA_BIN="/usr/lib/jvm/java-17-openjdk/bin/java"
+[ -x "$JAVA_BIN" ] || JAVA_BIN="$(command -v java)"
+"$JAVA_BIN" -noverify -cp "$ENGINE" com.hyperos.fcm.patcher.Main \
     --services "$SERVICES" \
     --miui-services "$MIUI_SERVICES" \
     --patcher "$DEXJAR" \

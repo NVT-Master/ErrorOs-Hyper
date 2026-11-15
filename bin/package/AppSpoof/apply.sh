@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # ---------------------------------------------------------------------------
 # AppSpoof - ham dung chung cho jar_patcher_a15.sh va jar_patcher_a16.sh.
 #
@@ -106,6 +106,21 @@ def fix_method(m):
     return m.group(0).replace(body, new_body, 1)
 
 s2 = pat.sub(fix_method, s)
+
+if total == 0:
+    # Android 16/17: method-wrapper khong khop hoac attach nam ngoai
+    # newApplication -> fallback file-scope (attach chi xuat hien 1 lan
+    # trong Instrumentation.smali).
+    s2, k = AT.subn(add_hook, s, count=1)
+    total += k
+    if k:
+        print("fallback: hook attach o ngoai newApplication khop")
+    else:
+        print("---- diagnostics: dong chua 'attach' ----")
+        for line in s.splitlines():
+            if "attach" in line:
+                print(line)
+
 open(path, "w", encoding="utf-8", newline="\n").write(s2)
 print("va %d newApplication" % total)
 PYEOF

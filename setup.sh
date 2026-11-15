@@ -7,7 +7,7 @@ echo "[setup] Arch Linux - cài phụ thuộc qua pacman"
 sudo pacman -Sy --noconfirm --needed \
     git aria2 jq rclone python python-pip wget lz4 xz zstd bc zip unzip 7zip \
     xmlstarlet erofs-utils e2fsprogs dtc zlib glibc libstdc++ \
-    gcc java-runtime-headless android-tools
+    gcc java-runtime-headless android-tools jdk17-openjdk python-configobj
 pip3 install --no-cache-dir ConfigObj telebot setuptools || true
 
 echo "[setup] Done."
