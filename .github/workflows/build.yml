@@ -72,7 +72,7 @@ jobs:
 
           # Không dùng NDK: binary chỉ cần libc chuẩn, cross-gcc của Arch Linux
           # (aarch64-linux-gnu-gcc) là đủ và tĩnh hoàn toàn, tự chứa.
-          pacman -S --noconfirm --needed gcc-aarch64-linux-gnu aarch64-linux-gnu-glibc
+          pacman -S --noconfirm --needed aarch64-linux-gnu-gcc aarch64-linux-gnu-glibc
           CC=aarch64-linux-gnu-gcc
           "$CC" --version | head -1
           echo "sysroot: $($CC -print-sysroot)"
