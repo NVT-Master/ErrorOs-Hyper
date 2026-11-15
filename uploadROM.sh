@@ -79,7 +79,7 @@ echo "$device_f" > "$target_out_dir/META-INF/Data/DeviceCode"
 repack "Done"
 
 # Định dạng tên file: Error OS_<codename>_<phiên bản os>_<ngày tháng năm>.zip
-build_date=$(TZ=Asia/Ho_Chi_Minh date +%d%m%Y)
+build_date=$(TZ=Asia/Ho_Chi_Minh date +%d%m%Y_%H%M)
 final_zip_name="Error OS_${device_code}_${base_rom_code}_${build_date}.zip"
 
 find "$target_out_dir" | xargs touch

@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 # ---------------------------------------------------------------------------
 # FCM push notification fix for HyperOS China ROMs
 #

@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 # ---------------------------------------------------------------------------
 # AppSpoof - ham dung chung cho jar_patcher_a15.sh va jar_patcher_a16.sh.
 #

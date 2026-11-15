@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 # SPDX-License-Identifier: GPL-3.0
 #
 # Ghi de trang thai bootloader o tang VUNG PROPERTY, chay bang init `exec` ngay

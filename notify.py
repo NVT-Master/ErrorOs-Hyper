@@ -105,7 +105,7 @@ def get_device_model():
             return val
     return ""
 
-def build_message(status, rom_link):
+def build_message(status, rom_link, gofile_link=""):
     status_l = status.lower()
     icon, title, hint = STATUS_MAP.get(status_l, ("ℹ️", status, ""))
 
@@ -176,6 +176,8 @@ def build_message(status, rom_link):
 
     if is_available(rom_link):
         lines.append(f"🔗 <a href='{html_esc(rom_link)}'>Nguồn ROM</a>")
+    if is_available(gofile_link):
+        lines.append(f"Gofile mirror (nhanh): <a href='{html_esc(gofile_link)}'>T?i ROM</a>")
 
     if status_l != "success":
         lines += ["", f"<i>{html_esc(hint)}</i>"]
@@ -226,12 +228,12 @@ def _send_telegram(bot_token, chat_id, payload, label=""):
 
 
 def send_notification(status, rom_link, channel_id, bot_token,
-                      builder_id="", download_link="", group_id=""):
+                      builder_id="", download_link="", group_id="", gofile_link=""):
     is_success = status.lower() == 'success'
     run_url = _get_run_url()
 
     # ── Tạo nội dung tin nhắn chính ──────────────────────────────
-    message = build_message(status, rom_link)
+    message = build_message(status, rom_link, gofile_link)
     if is_success and not is_available(download_link):
         message += "\n\n⚠️ <i>Upload lên Drive/Gofile thất bại — chưa có link tải.</i>"
 
@@ -307,6 +309,8 @@ if __name__ == "__main__":
     builder_id    = sys.argv[6] if len(sys.argv) > 6 else ""
     download_link = (sys.argv[7] if len(sys.argv) > 7 and sys.argv[7]
                      else os.environ.get("DOWNLOAD_LINK", ""))
+    gofile_link = (sys.argv[8] if len(sys.argv) > 8 and sys.argv[8]
+                   else os.environ.get("DOWNLOAD_LINK_GOFILE", ""))
 
     bot_token  = os.environ.get("TELEGRAM_BOT_TOKEN")
     channel_id = os.environ.get("TELEGRAM_CHANNEL_ID")
@@ -317,4 +321,4 @@ if __name__ == "__main__":
         sys.exit(0)
 
     send_notification(status, rom_link, channel_id, bot_token,
-                      builder_id, download_link, group_id)
+                      builder_id, download_link, group_id, gofile_link)

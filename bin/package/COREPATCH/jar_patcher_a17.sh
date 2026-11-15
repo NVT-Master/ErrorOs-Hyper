@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 # patcher_a17.sh - Android 17 framework/services patcher
 #
 # Bản port từ jar_patcher_a16.sh. Khác biệt so với A16:

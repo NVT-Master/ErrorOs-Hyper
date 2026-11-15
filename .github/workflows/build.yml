@@ -1,4 +1,4 @@
-name: Error OS ROM Build
+﻿name: Error OS ROM Build
 
 on:
   workflow_dispatch:
@@ -149,7 +149,7 @@ jobs:
           echo "DOWNLOAD_LINK=$LINK" >> "$GITHUB_ENV"
 
       - name: Upload ROM to Gofile.io
-        if: success() && steps.drive.outcome != 'success'
+        if: success()  # Gofile always mirrors Drive (not only as fallback)
         continue-on-error: true
         env:
           GOFILE_TOKEN: ${{ secrets.GOFILE_TOKEN }}
@@ -194,7 +194,7 @@ jobs:
           fi
 
           echo "Upload thành công! Link tải: $LINK"
-          echo "DOWNLOAD_LINK=$LINK" >> "$GITHUB_ENV"
+          echo "DOWNLOAD_LINK_GOFILE=$LINK" >> "$GITHUB_ENV"
 
       - name: Success Notification
         if: success()
