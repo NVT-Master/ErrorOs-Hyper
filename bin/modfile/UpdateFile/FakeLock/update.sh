@@ -31,7 +31,7 @@ trap 'rm -rf "$TMPD"' EXIT
 cp -f "$VENDOR_BOOT" "$TMPD/vendor_boot.img"
 
 cd "$TMPD" || exit 0
-if ! "$MAGISKBOOT" unpack "vendor_boot.img" >/dev/null 2>&1; then
+if ! "$MAGISKBOOT" unpack -h "vendor_boot.img" >/dev/null 2>&1; then
     cd "$work_dir"
     mods "FakeLock: unpack vendor_boot.img FAIL - bo qua (vendor_boot giu nguyen)"
     rm -rf "$TMPD"
