@@ -8,13 +8,17 @@ if [ ! -f "${baserom}" ] && [ "$(echo $baserom |grep http)" != "" ]; then
     info "Download link detected, starting a download..."
 
     # Kiem tra file tai ve co dung la mot zip hoan chinh khong.
-    # -f chi noi "co file", khong noi file do dung duoc: mot file bi cat ngang
-    # van qua duoc -f, va do chinh la cach build 05/11 di tiep voi mot zip
-    # 4.2/8.7 GiB roi chet o buoc unzip voi thong bao kho hieu
-    # "End-of-central-directory signature not found".
+    # unzip -t (Info-ZIP) FAIL VOI ZIP SIGNADPK LON (~8 GB) - download OK nhung
+    # -t bao loi -> build sai "file hong". Dung listing (unzip -l / 7z l) nhu
+    # buoc runtime cua build.sh dung, thua du kiem central directory.
     rom_zip_ok() {
         [ -f "$1" ] || return 1
-        unzip -t "$1" >/dev/null 2>&1
+        unzip -l "$1" >/dev/null 2>&1 && return 0
+        if command -v 7z >/dev/null 2>&1; then
+            7z l "$1" >/dev/null 2>&1
+            return $?
+        fi
+        return 1
     }
 
     # Ten file tren dia khac URL: --content-disposition lay ten tu header.
