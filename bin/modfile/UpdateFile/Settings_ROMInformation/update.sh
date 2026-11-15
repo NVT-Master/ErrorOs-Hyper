@@ -402,6 +402,18 @@ patch_settings_apk() {
     aspect=$(aspect_of "$SRC_DIR/ic_hyper_os.xml")
     mods "Settings: Wordmark aspect: $aspect"
 
+    # ---- inject tag below logo ------------------------------------------
+    # Them TextView duoi logo (Error OS 1.1 | @NVT-Master) vao miui_version_card.xml
+    # va code strings/public.xml chua chuoi string error_os_tag.
+    # File / Settings_ROMInformation/patch_about_tag.py reads miui_version_card.xml
+    # from each decode and injects the new TextView + string/public entries.
+    for resroot in "${resroots[@]}"; do
+        if [ -f "$resroot/layout/miui_version_card.xml" ]; then
+            python3 "$SRC_DIR/patch_about_tag.py" "$resroot" || warn "Settings: inject About tag failed"
+            break
+        fi
+    done
+
     local total=0
     local strings_done=0
     local png_used=0
