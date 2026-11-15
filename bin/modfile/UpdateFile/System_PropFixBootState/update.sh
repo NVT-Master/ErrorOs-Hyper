@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # SPDX-License-Identifier: GPL-3.0
 #
 # Ghi de trang thai bootloader o tang VUNG PROPERTY, chay bang init `exec` ngay
@@ -19,7 +19,7 @@
 #   bootloader base do khong cong bo prop nay (xem ghi chu trong config.env).
 #
 # CACH LAM
-#   bin/package/Error OSPropFix/erroros_propfix.c duoc bien dich san thanh binary
+#   bin/package/ErrorOSPropFix/erroros_propfix.c duoc bien dich san thanh binary
 #   arm64 o buoc "Build prop-fix helper" trong workflow (may build khong co
 #   compiler cross). Function doc thang dinh dang /dev/__properties__/*, khong
 #   dung bionic, nen build bang aarch64-linux-gnu-gcc -static la du - khong can
@@ -50,7 +50,7 @@ if [ "$ENABLE" = "false" ]; then
     exit 0
 fi
 
-SRC="$work_dir/bin/package/Error OSPropFix/erroros_propfix"
+SRC="$work_dir/bin/package/ErrorOSPropFix/erroros_propfix"
 IMG="$work_dir/build/baserom/images"
 DEST_BIN="$IMG/system/system/bin/erroros_propfix"
 DEST_RC="$IMG/system_ext/etc/init/init.erroros.propfix.rc"

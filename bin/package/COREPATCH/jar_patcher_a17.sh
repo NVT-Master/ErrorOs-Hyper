@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # patcher_a17.sh - Android 17 framework/services patcher
 #
 # Bản port từ jar_patcher_a16.sh. Khác biệt so với A16:
@@ -1156,6 +1156,20 @@ def fix_method(m):
     return m.group(0).replace(body, new_body, 1)
 
 s2 = pat.sub(fix_method, s)
+
+if total == 0:
+    # Android 16/17: attach co the o trong mn hoac method wrapper khong khop ->
+    # fallback file-scope (attach chi xuat hien 1 lan trong Instrumentation.smali).
+    s2, k = AT.subn(add_hook, s, count=1)
+    if k:
+        total += k
+        print("fallback: hook attach o ngoai newApplication khop")
+    else:
+        print("---- diagnostics: dong chua 'attach' ----")
+        for line in s.splitlines():
+            if "attach" in line:
+                print(line)
+
 open(path, "w", encoding="utf-8", newline="\n").write(s2)
 print("va %d newApplication" % total)
 PYEOF
