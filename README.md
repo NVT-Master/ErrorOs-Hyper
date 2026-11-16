@@ -26,7 +26,7 @@ Error OS là bản **fork lại hoàn chỉnh** của **BugOS-Hyper**, build t�
 | 📦 **Base ROM gốc** | Xiaomi OS4.0.2.0.XOLCNXM (China), **không gỡ GMS/Play/Chrome** |
 | 🧩 **FCM Fix (thông báo)** | Vá `miui-services.jar` Android 17 (broadcast/kill limits/force-stop), `isCnModel()=false` → GMS không bị đóng băng, FCM push luôn đến |
 | 🔎 **Circle to Search** + **Gemini power-button** | Giữ nguyên từ firmware gốc |
-| 🧰 **Error OS Toolbox** | Toolbox tích hợp ngay trong **Cài đặt → Toolbox** (wrench icon riêng) |
+| 🧰 **Error OS Toolbox** | Toolbox tích hợp trong **Cài đặt → Toolbox** (thay RootToolbox): 3 hàng — **Kaorios Toolbox**, cài/mở **SukiSU Ultra** (root manager), **Flash Module** (ZygiskNext + AlwaysStrong); không có icon launcher |
 | 🎨 **Artwork riêng "ERROR OS"** | Boot animation & logo Rubik Distressed (đen chủ đạo + chấm đỏ) — xem `bin/modfile/UpdateFile/BootAnimation/` |
 | ⚡ **PowerTune** | `bg_apps_limit` hợp lý; giữ pin + không lag |
 | 🚀 **Root (tuỳ chọn)** | SukiSU Ultra (LKM) — bật trong `config.env`: `sukisu=true` |
@@ -112,6 +112,7 @@ ErrorOS-Hyper rebuilds **Xiaomi HyperOS** OTA packages into a custom ROM. Scope:
 - Not a universal ROM builder; Xiaomi HyperOS only
 - Arch Linux only
 - GMS kept, FCM delivery fixed for Android 17, Circle-to-Search & Gemini retained
+- **Error OS Toolbox** (replaces RootToolbox) lives inside **Settings → Toolbox** — Kaorios Toolbox, SukiSU Ultra manager (install/open), Flash Module (Zygisk Next + AlwaysStrong); no launcher icon
 - Not an official Xiaomi / Nothing / Google product; flash at your own risk
 
 See **Build** section above. Arch Linux only.
