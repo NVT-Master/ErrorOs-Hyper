@@ -102,8 +102,8 @@ if [ "$DEBLOAT_SECURITYCENTER" = "true" ]; then
     warn "Debloat: debloat_securitycenter=true - xoá Trung tâm An toàn (mất quyền riêng tư, pin, mạng, chống spam)"
 fi
 
-rm -rf "$MAIN_FOLDER/product/etc/auto-install"*
-rm -rf "$MAIN_FOLDER/product/app/Updater"
+# rm -rf "$MAIN_FOLDER/product/etc/auto-install"*  # 2026-11-16: tắt theo yêu cầu user (chỉ gỡ 5 app duyệt; auto-install service giữ nguyên)
+#   rm -rf "$MAIN_FOLDER/product/app/Updater"      # 2026-11-16: tắt theo yêu cầu user; product/app/Updater là ứng viên OTA updater — không xoá không duyệt
 # cn.google.services.xml: xoá = hệ thống không khớp chứng thư Google của GMS/Play ->
 # rủi ro hỏng Play Integrity / FCM. Giữ mặc định; chỉ xoá khi đặt
 # remove_cn_google_servicesxml=true trong config.env.
