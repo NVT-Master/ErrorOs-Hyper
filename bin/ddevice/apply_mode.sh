@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------
 # apply_mode.sh - chuẩn hoá config.env theo "toolbox_mode" TRƯỚC khi build.
 #
-#   root    : ROM có root (sukisu=true) + Error OS Toolbox (product/app/ErrorOsToolbox)
+#   root    : ROM có root (sukisu=true) + Error OS Toolbox (product/app/RootToolbox)
 #   kaorios : ROM KHÔNG root (sukisu=false) + Kaorios Toolbox
 #             (product/app/KaoriosToolbox), Settings trỏ com.kousei.kaorios.
 #
@@ -47,8 +47,8 @@ else
     set_key sukisu true
     set_key erroros_toolbox true
     set_key kaorios_toolbox false
-    set_key toolbox_target_package com.erroros.toolbox
-    set_key toolbox_target_class com.erroros.toolbox.MainActivity
+    set_key toolbox_target_package com.nvt.roottoolbox
+    set_key toolbox_target_class com.nvt.roottoolbox.MainActivity
 fi
 
 echo "[mode] toolbox_mode=$mode"

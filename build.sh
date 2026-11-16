@@ -209,10 +209,13 @@ done
 # trên các image hiện có. Vá boot.img sau đó là vbmeta lệch.
 bash "$work_dir/bin/package/SukiSU/patch.sh"
 
-# ==================== ERROR OS TOOLBOX (app của user) ====================
-# App tự chứa SukiSU manager + module; ROM chỉ đặt vào product/app.
-# (Thay RootToolbox - bản cũ giữ nguyên trong bin/package/RootToolbox để rollback.)
-bash "$work_dir/bin/package/ErrorOsToolbox/patch.sh"
+# ==================== ROOT TOOLBOX (app của user) ====================
+# App gốc của user: giao diện đầy đủ (spoof/patcher/module), tự chứa SukiSU
+# manager (assets/sukisu_ultra.apk) và module
+# (assets/ZygiskNext+AlwaysStrongInject.zip); ROM chỉ đặt vào product/app.
+# (Error OS Toolbox bản đơn giản của mình giữ lại trong bin/package/ErrorOsToolbox,
+#  không gọi trong root build - người dùng chọn bản cũ đẹp hơn.)
+bash "$work_dir/bin/package/RootToolbox/patch.sh"
 
 # ==================== KAORIOS TOOLBOX (mode không root) ====================
 # Chỉ chạy khi toolbox_mode=kaorios. APK giữ nguyên chữ ký của Kaorios.
