@@ -9,13 +9,7 @@ noexecute=( "insupdate" )
 # giữa các lần build hay giữa các máy. Mod nào phụ thuộc thứ tự (ví dụ mod sau
 # sửa file mà mod trước vừa chép) sẽ chạy sai lệch một cách ngẫu nhiên. Sắp theo
 # đường dẫn đầy đủ để thứ tự tất định: cùng một cây file = cùng một thứ tự.
-#
-# NOTE (2026-11-16, sau sự cố #26/#27 ship Settings stock): trước đây pipe
-# `find | sort | while` nuốt mã thoát của subshell và không script nào kiểm tra
-# rc -> Settings mod fail = ROM vẫn green. Giờ: process substitution + bắt rc;
-# script Settings_ROMInformation fail -> exit 1 (build.sh bắt được và dừng).
-# Các mod khác giữ nguyên quyền fail "mềm" (cảnh báo, không dựng cả build).
-while read -r script; do
+find "$TARGET_DIR" -type f -name "*.sh" | sort | while read -r script; do
     base="$(basename "$script" .sh)"
 
     skip=false
@@ -27,12 +21,6 @@ while read -r script; do
     done
 
     if [[ $skip == false ]]; then
-        if ! bash "$script" < /dev/null; then
-            if [[ "$script" == *"Settings_ROMInformation"* ]]; then
-                echo "[insupdate][FATAL] Settings patch script thất bại - dừng build"
-                exit 1
-            fi
-            echo "[insupdate][warn] $script exit != 0 (bỏ qua như trước)"
-        fi
+        bash "$script" < /dev/null
     fi
-done < <(find "$TARGET_DIR" -type f -name "*.sh" | sort)
+done

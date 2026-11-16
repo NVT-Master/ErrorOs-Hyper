@@ -5,13 +5,14 @@
 #
 # Chỉ chạy khi toolbox_mode=kaorios: bin/ddevice/apply_mode.sh đặt
 # kaorios_toolbox=true và tắt erroros_toolbox/sukisu.
-# (Root build KHÔNG cài Kaorios: cần NothingVN backend + framework hooks,
-#  không có ở Error OS - app chỉ là vỏ UI.)
 #
-# Khác ErrorOsToolbox: đây là APK có sẵn của Kaorios (không sửa, không ký lại),
+# Khác RootToolbox: đây là APK có sẵn của Kaorios (không sửa, không ký lại),
 # nên giữ nguyên chữ ký gốc của họ. Vì là app hệ thống thường (không phải
 # priv-app) và ROM không root, các tính năng cần ghi /data/adb sẽ không hoạt
 # động - app chỉ dùng được phần đọc trạng thái/framework hook có sẵn.
+#
+# Mục Cài đặt -> Toolbox trỏ tới com.kousei.kaorios.MainActivity, do
+# patch_settings_mod.py đọc toolbox_target_package|class từ config.env.
 # ---------------------------------------------------------------------------
 
 work_dir=$(pwd)

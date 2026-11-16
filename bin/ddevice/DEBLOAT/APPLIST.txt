@@ -1,74 +1,27 @@
-# ===========================================================================
-# APPLIST.txt — Error OS DEBLOAT list (BugOS-style, restored 2026-11-16)
-#
-# User decision (2026-11-16): undoing the full gutting; restore the BugOS-Hyper
-# inherited debloat on the China base — it is what made builds #22..#27 lean.
-# The ONLY additions/changes over raw BugOS:
-#   A. Google/GMS components — KEEP (never deleted):
-#      FidoAuthen, FidoAuthen2, GooglePlayServicesUpdater, Gmail2, GoogleOne,
-#      GoogleOne_arm64, Maps, YouTube, YTMusic, Drive, Meet, Podcasts,
-#      CalendarGoogle(+_arm64/_xxhdpi/_xxxhdpi), GoogleNews(+_xxhdpi/_xxxhdpi),
-#      Photos.
-#      [ConfigUpdater is already absent: BugOS's own 'Updater' glob would have
-#      caught it; 'Updater' is also excluded below.]
-#   B. China market + system updater (kept by keep_getapps):
-#      MIUISuperMarket, MiuiSuperMarket, MIUIMiPicks, MIUISystemAppUpdater.
-#   C. WPS Office (user requirement): GlobalWPSLITE, wps-lite.
-#   D. Plain 'Updater' entry — excluded (its glob would delete
-#      GooglePlayServicesUpdater + the China OTA updater).
-#
-#   The 5 user-approved apps (tinygame, huanji, scanner, yellowpage, analytics)
-#   are still removed via bin/modfile/UpdateFile/Remove_TinyGame/update.sh.
-#
-# User-visible risk notes (inherited-as-BugOS, NOT changed by decision):
-#   Stk (SIM Toolkit — USSD/carrier), MIUIgreenguard (pin management),
-#   com.miui.guardprovider (anti-spam), DownloadProviderUi (Downloads screen),
-#   MSA (MIUI ad push) — all still removed, exactly as BugOS did for #22.
-# ===========================================================================
-===========================================================================
-APPLIST.txt — Error OS DEBLOAT list
-# #
-Trước đây file này kế thừa nguyên danh sách của BugOS-Hyper (ROM EU/Global) -
-nó tự xoá ~145 thư mục/package, trong đó có thành phần GMS (GooglePlayServices
-Updater, ConfigUpdater) và ~45 package China mà user chưa duyệt.
-# #
-Theo yêu cầu user (2026-11-16):
-    com.xiaomi.tinygame  - Spotlight mini-games
-    com.miui.huanji      - Mi Mover
-    com.xiaomi.scanner   - Mi Scanner (QR/barcode)
-    com.miui.yellowpage  - Danh bạ vàng China (ads)
-    com.miui.analytics   - Xiaomi telemetry
-# #
-  GMS/Google KHÔNG xóa bất kỳ thứ gì trong ROM này.
-# #
-Toàn bộ danh sách cũ đang được comment sẵn bên dưới — KHÔNG uncomment mặc
-định. Chỉ uncomment khi user duyệt từng app sau khi xem tên + tác dụng
-(xem D:\BAO_CAO_ERROR_OS_FULL.md mục 9 — danh sách ~45 package).
-===========================================================================
-# KEEP (GMS/FIDO auth): FidoAuthen
+FidoAuthen
 GameCenterGlobal
-# KEEP (Google app): Gmail2
-# KEEP (Google app): GoogleOne
+Gmail2
+GoogleOne
 MIUIGlobalLayout
-# KEEP (China app store (keep_getapps)): MIUIMiPicks
-# KEEP (China system updater (keep_getapps)): MIUISystemAppUpdater
+MIUIMiPicks
+MIUISystemAppUpdater
 MSA-Global
-# KEEP (Google app): Maps
+Maps
 PlayAutoInstallStubApp
-# KEEP (KEEP — glob would delete ConfigUpdater & OTA updater): Updater
-# KEEP (Google app): YouTube
+Updater
+YouTube
 MIServiceGlobal
 MIUIMusicGlobal
 BasicDreams
-# KEEP (SIM Toolkit / USSD — chủ nhà mạng Viettel/Vina/MobiFone user requirement 2026-11-16): Stk
-# KEEP (SIM Toolkit / USSD): Stk1
-# KEEP (Google app): GoogleOne_arm64
-# KEEP (WPS Office (user requirement)): GlobalWPSLITE
-# KEEP (Google app): GoogleNews_xxhdpi
-# KEEP (Google app): GoogleNews_xxxhdpi
+Stk
+Stk1
+GoogleOne_arm64
+GlobalWPSLITE
+GoogleNews_xxhdpi
+GoogleNews_xxxhdpi
 MICOMMUNITY_OVERSEA
 MISTORE_OVERSEA
-# KEEP (Google app): Podcasts
+Podcasts
 SmartHome
 XMRemoteController
 AppBox
@@ -76,26 +29,26 @@ AppCenter
 AppCloud
 HealthConnectStub
 MIBrowserGlobal_builtin_before_2021
-# KEEP (Google app): Drive
+Drive
 MIUIHealthGlobal
-# KEEP (Google app): Meet
-# KEEP (Google app): Photos
+Meet
+Photos
 MiShop
 Videos
-# KEEP (Google app): YTMusic
-# KEEP (Google app): YouTube
+YTMusic
+YouTube
 MiGalleryLockScreenGlobalOs020
 MiGalleryLockScreenGlobal
 POCOCOMMUNITY_OVERSEA
 POCOSTORE_OVERSEA
 LinkToWindows
-# KEEP (GMS/FIDO auth): FidoAuthen2
+FidoAuthen2
 HybridPlatform
 MIUIAiasstService
 MIUISecurityInputMethod
-# KEEP (China app store (keep_getapps)): MIUISuperMarket
+MIUISuperMarket
 MSA
-# KEEP (China app store (keep_getapps)): MiuiSuperMarket
+MiuiSuperMarket
 MiBrowser
 MIUIMusic
 Email
@@ -126,8 +79,8 @@ MIUIVirtualSim
 MIUIXiaoAiSpeechEngine
 OS2VipAccount
 iFlytekIME
-# KEEP (WPS Office (user requirement)): wps-lite
-# KEEP (GMS self-update): GooglePlayServicesUpdater
+wps-lite
+GooglePlayServicesUpdater
 MIUIBrowser
 MIUIQuickSearchBox
 PersonalSafety
@@ -147,11 +100,11 @@ skt-appinstaller
 MIBrowserGlobal
 MIGalleryLockScreenGlobal
 Duo
-# KEEP (Google app): GoogleNews
-# KEEP (Google app): CalendarGoogle
-# KEEP (Google app): CalendarGoogle_arm64
-# KEEP (Google app): CalendarGoogle_xxhdpi
-# KEEP (Google app): CalendarGoogle_xxxhdpi
+GoogleNews
+CalendarGoogle
+CalendarGoogle_arm64
+CalendarGoogle_xxhdpi
+CalendarGoogle_xxxhdpi
 byglgnite
 com.altice.android.myapps
 com.sfr.android.sfrjeux
@@ -165,7 +118,8 @@ Padapp
 MIUIThemeManagerPad
 Mi Cion
 Mi Video
-# # --- Debloat theo package (khớp AXML, không phụ thuộc tên thư mục) ---
+
+# --- Debloat theo package (khớp AXML, không phụ thuộc tên thư mục) ---
 pkg:com.miui.video
 pkg:com.xiaomi.vipaccount
 pkg:com.xiaomi.payment
@@ -173,7 +127,7 @@ pkg:com.miui.carlink
 pkg:com.miui.newhome
 pkg:com.xiaomi.aiasst.vision
 pkg:com.xiaomi.digitalkey
-# KEEP (pin management — user requirement 2026-11-16, conflict với tiết kiệm pin): pkg:com.miui.greenguard
+pkg:com.miui.greenguard
 pkg:com.xiaomi.migameservice
 pkg:com.xiaomi.ab
 pkg:com.xiaomi.macro
@@ -185,5 +139,5 @@ pkg:com.xiaomi.gamecenter.sdk.service
 pkg:com.xiaomi.mis
 pkg:com.xiaomi.type
 pkg:com.unionpay.tsmservice.mi
-# KEEP (chặn spam SMS/caller ID — user requirement 2026-11-16): pkg:com.miui.guardprovider
+pkg:com.miui.guardprovider
 pkg:com.mobiletools.systemhelper

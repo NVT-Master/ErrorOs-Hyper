@@ -26,7 +26,7 @@ DEFAULT_PKG = "com.nvt.roottoolbox"
 DEFAULT_CLS = "com.nvt.roottoolbox.MainActivity"
 
 # Mọi package từng dùng cho mục Toolbox — để gỡ bản cũ trước khi chèn bản mới.
-TOOLBOX_PKG_RE = r"(?:com\.khai\.roottoolbox|com\.nvt\.roottoolbox|com\.kousei\.kaorios|com\.erroros\.toolbox)"
+TOOLBOX_PKG_RE = r"(?:com\.khai\.roottoolbox|com\.kousei\.kaorios)"
 
 
 def _read_config_value(key):
@@ -126,12 +126,8 @@ def patch_settings_headers(file_path):
     #   "Undefined entry name: <id name="..."/>"  -> build fail.
     # Nên dùng id có sẵn của framework: khác namespace (0x0102xxxx) với id của
     # Settings (0x7f0bxxxx) nên không đụng id nào khác trong danh sách.
-    # Icon mục Toolbox: tham chiếu drawable FRAMEWORK (@android:drawable/ic_mode_edit),
-    # KHÔNG chèn bất kỳ drawable mới nào vào Settings.apk và KHÔNG ghi đè drawable
-    # hiện có của "Cài đặt bổ sung" -> icon khác nhau tuyệt đối, không thể làm
-    # rebuild fail (external framework ref không cần resources.arsc của package_1).
     mod_header = (
-        '\n  <header android:icon="@android:drawable/ic_mode_edit"'
+        '\n  <header android:icon="@drawable/ic_other_advanced_settings"'
         '\n          android:id="@android:id/title"'
         '\n          android:title="Toolbox">'
         f'\n    <intent android:targetPackage="{pkg}"'
@@ -199,7 +195,7 @@ def patch_top_level_settings(file_path):
         return False
 
     mod_pref = (
-        '\n    <com.android.settings.widget.HomepagePreference android:icon="@android:drawable/ic_mode_edit"'
+        '\n    <com.android.settings.widget.HomepagePreference android:icon="@drawable/ic_other_advanced_settings"'
         '\n                          android:title="Toolbox"'
         '\n                          android:order="-9">'
         f'\n        <intent android:targetPackage="{pkg}"'
