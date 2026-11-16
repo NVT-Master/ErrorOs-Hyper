@@ -10,8 +10,8 @@
 #   - Row SukiSU Ultra: mở manager nếu đã cài, chưa cài thì mở trình cài
 #     đặt (xác nhận 1 lần) - đúng luồng Root Toolbox trước đây.
 #   - Row Flash Module: chạy su + customize.sh của bundle (zygisksu + tricky_store).
-#   - Row Kaorios: mở com.kousei.kaorios (install KaoriosToolbox vào product/app,
-#     xem bin/package/KaoriosToolbox/patch.sh - chạy khi erroros_toolbox=true).
+#   (Row Kaorios đã bỏ: Kaorios cần NothingVN backend + framework hooks,
+#    ROM này không có nên app chỉ là vỏ UI.)
 #
 # Settings trỏ tới com.erroros.toolbox/.MainActivity, do patch_settings_mod.py
 # đọc toolbox_target_package|class từ config.env.

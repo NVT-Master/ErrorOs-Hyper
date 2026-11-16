@@ -19,7 +19,6 @@ import java.io.InputStreamReader;
 
 public class MainActivity extends Activity {
     private static final String TAG = "ErrorOSToolbox";
-    private static final String KAORIOS_PKG = "com.kousei.kaorios";
     private static final String SUKISU_PKG = "com.sukisu.ultra";
     private static final String MODULE_ZIP_ASSET = "module.zip";
     private static final String SUKISU_APK_ASSET = "sukisu_ultra.apk";
@@ -31,21 +30,8 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
         statusLine = findViewById(R.id.status_line);
-        findViewById(R.id.row_kaorios).setOnClickListener(v -> launchPackage(KAORIOS_PKG, "Kaorios Toolbox"));
         findViewById(R.id.row_sukisu).setOnClickListener(v -> openOrInstallSukisu());
         findViewById(R.id.row_module).setOnClickListener(v -> confirmFlashModule());
-    }
-
-    private void launchPackage(String pkg, String label) {
-        PackageManager pm = getPackageManager();
-        Intent launch = pm.getLaunchIntentForPackage(pkg);
-        if (launch != null) {
-            launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(launch);
-        } else {
-            Toast.makeText(this, label + " chưa được cài đặt", Toast.LENGTH_LONG).show();
-            Log.w(TAG, "not installed: " + pkg);
-        }
     }
 
     private void openOrInstallSukisu() {

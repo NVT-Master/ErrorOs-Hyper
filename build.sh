@@ -375,6 +375,12 @@ bash $work_dir/bin/modfile/OS3/insmod.sh
 bash $work_dir/bin/modfile/OS4/insmod.sh
 bash $work_dir/bin/modfile/Universal/insfile.sh
 bash $work_dir/bin/modfile/UpdateFile/insupdate.sh
+# Fix #26/#27: Settings patch từng fail mà ROM vẫn đóng gói (insupdate nuốt rc).
+# insupdate giờ exit 1 khi Settings_ROMInformation fail -> dừng hẳn build.
+if [ $? -ne 0 ]; then
+    error "UpdateFile pipeline thất bại (Settings patch?) - dừng build, ROM sẽ không được đóng gói."
+    exit 1
+fi
 bash $work_dir/bin/package/patchpackage.sh
 
 # ----> ĐIỀU KIỆN ÁP DỤNG ĐỊNH DANH VÀ BẢN QUYỀN <----

@@ -625,21 +625,11 @@ PY
     mods "Settings: drawable=$total  string=$strings_done"
 
     # ---- Icon mục Toolbox ------------------------------------------------
-    # Tạo drawable RIÊNG ic_toolbox_erroros.xml (KHÔNG đụng ic_other_advanced_settings.xml
-    # của mục "Cài đặt bổ sung" - trước đây ghi đè khiến 2 mục trùng icon).
-    local tb_icon="$SRC_DIR/ic_toolbox.xml"
-    if [ -f "$tb_icon" ]; then
-        local tb_n=0 tb_d
-        for tb_d in $(find "$out" -path '*/res/drawable*' -type d 2>/dev/null); do
-            [ -n "$tb_d" ] || continue
-            cp -f "$tb_icon" "$tb_d/ic_toolbox_erroros.xml" && tb_n=$((tb_n + 1))
-        done
-        if [ "$tb_n" -gt 0 ]; then
-            mods "Settings: icon Toolbox -> $tb_n drawable (ic_toolbox_erroros)"
-        else
-            warn "Settings: không tạo được ic_toolbox_erroros - mục Toolbox sẽ thiếu icon"
-        fi
-    fi
+    # KHÔNG chèn asset nào: mục Toolbox trỏ thẳng @android:drawable/ic_mode_edit
+    # (framework-res, MIUI-native), "Cài đặt bổ sung" giữ nguyên icon stock.
+    # Trước đây (6c309ab) tạo drawable mới ic_toolbox_erroros -> rebuild fail
+    # "Local resource not defined" -> ROM ship Settings stock. Không lặp lại.
+    mods "Settings: icon Toolbox -> @android:drawable/ic_mode_edit (framework)"
 
     # ---- Menu: Tích hợp Toolbox vào Cài đặt -> Mod ------------------------
     local mod_ok=0
@@ -785,7 +775,12 @@ while IFS= read -r apk; do
     [ -f "$apk" ] || continue
     found=$((found + 1))
     idx=$((idx + 1))
-    patch_settings_apk "$apk" "$idx"
+    if ! patch_settings_apk "$apk" "$idx"; then
+        # Bản #26/#27 từng fail ở đây mà không ai biết (loop nuốt rc + insupdate
+        # nuốt tiếp) -> ROM ship Settings stock. Fail LOUD chứ không thầm nữa.
+        error "Settings: patch THẤT BẠI cho $apk - dừng build (ROM sẽ mất About/logo/Toolbox nếu ship Settings gốc)."
+        exit 1
+    fi
 done < <(find "$MAIN_FOLDER" -type f -name "Settings.apk" 2>/dev/null)
 
 [ "$found" -eq 0 ] && warn "Không tìm thấy Settings.apk trong images"
