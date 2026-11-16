@@ -22,11 +22,11 @@ import re
 import sys
 import xml.etree.ElementTree as ET
 
-DEFAULT_PKG = "com.nvt.roottoolbox"
-DEFAULT_CLS = "com.nvt.roottoolbox.MainActivity"
+DEFAULT_PKG = "com.erroros.toolbox"
+DEFAULT_CLS = "com.erroros.toolbox.MainActivity"
 
 # Mọi package từng dùng cho mục Toolbox — để gỡ bản cũ trước khi chèn bản mới.
-TOOLBOX_PKG_RE = r"(?:com\.khai\.roottoolbox|com\.kousei\.kaorios)"
+TOOLBOX_PKG_RE = r"(?:com\.khai\.roottoolbox|com\.nvt\.roottoolbox|com\.kousei\.kaorios|com\.erroros\.toolbox)"
 
 
 def _read_config_value(key):

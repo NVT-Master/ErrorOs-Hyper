@@ -3,24 +3,23 @@
 # ---------------------------------------------------------------------------
 # Kaorios Toolbox - đặt APK vào product/app/KaoriosToolbox.
 #
-# Chỉ chạy khi toolbox_mode=kaorios: bin/ddevice/apply_mode.sh đặt
-# kaorios_toolbox=true và tắt erroros_toolbox/sukisu.
+# Chạy khi kaorios_toolbox=true (toolbox_mode=kaorios, không root)
+# hoặc erroros_toolbox=true (toolbox_mode=root): mục Toolbox của Error OS
+# Toolbox có Row 1 mở com.kousei.kaorios, nên APK phải có mặt trong ROM.
 #
-# Khác RootToolbox: đây là APK có sẵn của Kaorios (không sửa, không ký lại),
+# Khác ErrorOsToolbox: đây là APK có sẵn của Kaorios (không sửa, không ký lại),
 # nên giữ nguyên chữ ký gốc của họ. Vì là app hệ thống thường (không phải
 # priv-app) và ROM không root, các tính năng cần ghi /data/adb sẽ không hoạt
 # động - app chỉ dùng được phần đọc trạng thái/framework hook có sẵn.
-#
-# Mục Cài đặt -> Toolbox trỏ tới com.kousei.kaorios.MainActivity, do
-# patch_settings_mod.py đọc toolbox_target_package|class từ config.env.
 # ---------------------------------------------------------------------------
 
 work_dir=$(pwd)
 source "$work_dir/functions.sh"
 
 ENABLE=$(grep -m1 '^kaorios_toolbox=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
-if [ "$ENABLE" != "true" ]; then
-    mods "KaoriosToolbox: bỏ qua (kaorios_toolbox=$ENABLE)"
+TOOLBOX=$(grep -m1 '^erroros_toolbox=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
+if [ "$ENABLE" != "true" ] && [ "$TOOLBOX" != "true" ]; then
+    mods "KaoriosToolbox: bỏ qua (kaorios_toolbox=$ENABLE, erroros_toolbox=$TOOLBOX)"
     exit 0
 fi
 

@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#141416"
+    android:padding="24dp">
+
+    <TextView android:id="@+id/brand"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="2dp"
+        android:text="ERROR OS"
+        android:textColor="#FFD30F"
+        android:textSize="14sp"
+        android:letterSpacing="0.4"
+        android:textStyle="bold"
+        android:paddingLeft="2dp"
+        android:paddingRight="2dp"/>
+
+    <TextView android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Toolbox"
+        android:textColor="#F2F2F7"
+        android:textSize="52sp"
+        android:letterSpacing="-0.02"
+        android:textStyle="bold"
+        android:layout_marginBottom="4dp"/>
+
+    <TextView android:id="@+id/sub"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Custom build for Redmi Turbo 4 Pro"
+        android:textColor="#8E8E96"
+        android:textSize="14sp"
+        android:layout_marginBottom="36dp"/>
+
+    <LinearLayout android:id="@+id/row_kaorios"
+        android:layout_width="match_parent"
+        android:layout_height="96dp"
+        android:background="#1F1F23"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="18dp"
+        android:layout_marginBottom="12dp">
+        <View android:layout_width="10dp"
+              android:layout_height="56dp"
+              android:background="#FFD30F"
+              android:layout_marginEnd="16dp"/>
+        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Kaorios Toolbox" android:textColor="#F2F2F7" android:textSize="20sp" android:textStyle="bold"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Anti-detected setup — bỏ qua GMS certifies" android:textColor="#8E8E96" android:textSize="12sp" android:layout_marginTop="2dp"/>
+        </LinearLayout>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="›" android:textColor="#FFD30F" android:textSize="28sp"/>
+    </LinearLayout>
+
+    <LinearLayout android:id="@+id/row_sukisu"
+        android:layout_width="match_parent"
+        android:layout_height="96dp"
+        android:background="#1F1F23"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="18dp"
+        android:layout_marginBottom="12dp">
+        <View android:layout_width="10dp" android:layout_height="56dp" android:background="#5E5CE6" android:layout_marginEnd="16dp"/>
+        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="SukiSU Ultra" android:textColor="#F2F2F7" android:textSize="20sp" android:textStyle="bold"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Cài (nếu chưa có) hoặc mở root manager" android:textColor="#8E8E96" android:textSize="12sp" android:layout_marginTop="2dp"/>
+        </LinearLayout>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="›" android:textColor="#5E5CE6" android:textSize="28sp"/>
+    </LinearLayout>
+
+    <LinearLayout android:id="@+id/row_module"
+        android:layout_width="match_parent"
+        android:layout_height="96dp"
+        android:background="#1F1F23"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="18dp">
+        <View android:layout_width="10dp" android:layout_height="56dp" android:background="#30D158" android:layout_marginEnd="16dp"/>
+        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Flash Module" android:textColor="#F2F2F7" android:textSize="20sp" android:textStyle="bold"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Zygisk Next + AlwaysStrong — reboot để áp dụng" android:textColor="#8E8E96" android:textSize="12sp" android:layout_marginTop="2dp"/>
+        </LinearLayout>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="›" android:textColor="#30D158" android:textSize="28sp"/>
+    </LinearLayout>
+
+    <TextView android:id="@+id/status_line"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Chọn một mục bên dưới"
+        android:textColor="#8E8E96"
+        android:textSize="12sp"
+        android:layout_marginTop="8dp"
+        android:gravity="center"/>
+</LinearLayout>
