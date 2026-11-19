@@ -529,3 +529,9 @@ for f in \
 done
 
 find "$work_dir/build/baserom/images/" -exec touch -t 200901010000.00 {} + 2> /dev/null || true
+
+# ----> ĐÓNG GÓI ROM (super.img + flashable zip + output metadata) <----
+# Workflow CI chạy build.sh; nếu không gọi pack/upload thì sẽ không có
+# out/*.zip và bin/ddevice/output_zip.txt để upload/notify.
+bash "$work_dir/packROM.sh" || { error "packROM.sh thất bại"; exit 1; }
+bash "$work_dir/uploadROM.sh" || { error "uploadROM.sh thất bại"; exit 1; }

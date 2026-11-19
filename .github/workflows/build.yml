@@ -77,6 +77,7 @@ jobs:
         run: |
           set -euo pipefail
           chmod -R 777 . || true
+          set +e
           docker run --rm --privileged \
             -e INPUT_URL="$INPUT_URL" \
             -e TELEGRAM_BOT_TOKEN="$TELEGRAM_BOT_TOKEN" \
@@ -101,6 +102,11 @@ jobs:
               echo "[ci] Starting build..."
               bash build.sh "$INPUT_URL" "$GITHUB_REPOSITORY" "xiaomi" "iabi" "${TELEGRAM_BOT_TOKEN:-}" "${TELEGRAM_CHAT_ID:-}" "${TELEGRAM_GROUP_ID:-}" "${TELEGRAM_TOPIC_ID:-}" 2>&1 | tee -a build/build.log
             '
+          docker_rc=$?
+          set -e
+          # Container may create root-owned files; fix perms so later steps/artifacts can read/write.
+          chmod -R a+rwX build bin/ddevice out 2>/dev/null || sudo chmod -R a+rwX build bin/ddevice out 2>/dev/null || true
+          exit $docker_rc
 
       - name: Upload ROM to Google Drive
         id: upload_gdrive
@@ -201,6 +207,8 @@ jobs:
           set -euo pipefail
           mkdir -p build
           NOTIFY_LOG="build/telegram_notify.log"
+          touch "$NOTIFY_LOG" 2>/dev/null || sudo touch "$NOTIFY_LOG" 2>/dev/null || true
+          chmod 666 "$NOTIFY_LOG" 2>/dev/null || sudo chmod 666 "$NOTIFY_LOG" 2>/dev/null || true
           exec > >(tee -a "$NOTIFY_LOG") 2>&1
 
           echo "[notify] === Telegram notify start ==="

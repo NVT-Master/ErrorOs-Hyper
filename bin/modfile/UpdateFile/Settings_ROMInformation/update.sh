@@ -625,22 +625,22 @@ PY
     mods "Settings: drawable=$total  string=$strings_done"
 
     # ---- Icon mục Toolbox ------------------------------------------------
-    # Thay drawable ic_other_advanced_settings bằng icon riêng.
-    # Drawable này chỉ được 4 file XML của mục Toolbox tham chiếu (đã kiểm tra
-    # trực tiếp trên Settings.apk: settings_headers + top_level_settings*), nên
-    # đổi không ảnh hưởng mục nào khác. Có cả bản drawable-night-v8 nên phải
-    # thay hết mọi biến thể tìm được.
+    # Dùng drawable riêng cho Toolbox để tránh ghi đè icon gốc của mục
+    # "Cài đặt bổ sung / Other advanced settings" (ic_other_advanced_settings)
+    # nếu ROM sử dụng chung drawable này.
     local tb_icon="$SRC_DIR/ic_toolbox.xml"
     if [ -f "$tb_icon" ]; then
-        local tb_n=0 tb_f
-        while IFS= read -r tb_f; do
-            [ -n "$tb_f" ] || continue
-            cp -f "$tb_icon" "$tb_f" && tb_n=$((tb_n + 1))
-        done < <(find "$out" -path '*/res/drawable*' -name 'ic_other_advanced_settings.xml' 2>/dev/null)
+        local tb_n=0 tb_dir
+        while IFS= read -r tb_dir; do
+            [ -n "$tb_dir" ] || continue
+            if cp -f "$tb_icon" "$tb_dir/ic_erroros_toolbox.xml"; then
+                tb_n=$((tb_n + 1))
+            fi
+        done < <(find "$out/resources" -type d -path '*/res/drawable*' 2>/dev/null)
         if [ "$tb_n" -gt 0 ]; then
-            mods "Settings: icon Toolbox -> $tb_n drawable"
+            mods "Settings: icon Toolbox -> ic_erroros_toolbox ($tb_n drawable dirs)"
         else
-            warn "Settings: không thấy drawable ic_other_advanced_settings để thay icon"
+            warn "Settings: không tìm thấy thư mục drawable để thêm icon Toolbox"
         fi
     fi
 
