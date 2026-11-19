@@ -23,131 +23,20 @@ jobs:
   build:
     name: Initialize
     runs-on: ubuntu-latest
-    container:
-      image: archlinux:latest
-      options: --privileged
 
     steps:
-      - name: Prepare container tools
-        run: |
-          set -euo pipefail
-          # Running inside Arch container; install tools needed for space maximization and build.
-          pacman -Sy --noconfirm --needed \
-            sudo git python rclone curl \
-            util-linux procps-ng lvm2 e2fsprogs findutils coreutils grep gawk sed docker
-
       - name: Maximize build space
-        continue-on-error: true
-        shell: bash
-        run: |
-          # Best-effort disk space maximization for containerized job.
-          # Do not fail the build if this environment cannot support LVM loop setup.
-          set -uo pipefail
-          set -x
-
-          ROOT_RESERVE_MB=4096
-          TEMP_RESERVE_MB=2048
-          SWAP_SIZE_MB=1024
-          OVERPROVISION_LVM=false
-          BUILD_MOUNT_PATH="${GITHUB_WORKSPACE}"
-          BUILD_MOUNT_OWNERSHIP="runner:runner"
-          PV_LOOP_PATH="/pv.img"
-          TMP_PV_LOOP_PATH="/mnt/tmp-pv.img"
-          VG_NAME=buildvg
-
-          echo "== Disk space report before modification =="
-          free -h || true
-          echo
-          swapon --show || true
-          echo
-          df -h || true
-          echo
-
-          echo "Removing unwanted software (best effort)..."
-          rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
-          if command -v docker >/dev/null 2>&1; then
-            docker image prune --all --force >/dev/null 2>&1 || true
-          fi
-          echo "... done"
-
-          WORKSPACE_OWNER="$(stat -c '%U:%G' "${GITHUB_WORKSPACE}" 2>/dev/null || echo root:root)"
-          mkdir -p "${BUILD_MOUNT_PATH}" || true
-          find "${BUILD_MOUNT_PATH}" -maxdepth 0 ! -empty -exec echo 'WARNING: directory [{}] is not empty, data loss might occur. Content:' \; -exec ls -al "{}" \; || true
-
-          swapoff -a || true
-          rm -f /mnt/swapfile || true
-
-          # If required tools/devices are unavailable, skip LVM setup gracefully.
-          for cmd in losetup fallocate pvcreate vgcreate lvcreate mkswap swapon mkfs.ext4 mount; do
-            if ! command -v "$cmd" >/dev/null 2>&1; then
-              echo "[maximize] missing command: $cmd - skipping LVM build space setup"
-              exit 0
-            fi
-          done
-          if [ ! -e /dev/loop-control ] && [ ! -e /dev/loop0 ]; then
-            echo "[maximize] loop devices not available - skipping LVM build space setup"
-            exit 0
-          fi
-
-          echo "Creating LVM volume..."
-          ROOT_RESERVE_KB=$((ROOT_RESERVE_MB * 1024))
-          ROOT_FREE_KB=$(df --block-size=1024 --output=avail / | tail -1 | tr -dc '0-9')
-          ROOT_LVM_SIZE_KB=$((ROOT_FREE_KB - ROOT_RESERVE_KB))
-          if [ "$ROOT_LVM_SIZE_KB" -le 0 ]; then
-            echo "[maximize] not enough space on / for root LVM image - skipping"
-            exit 0
-          fi
-          ROOT_LVM_SIZE_BYTES=$((ROOT_LVM_SIZE_KB * 1024))
-          rm -f "${PV_LOOP_PATH}" || true
-          touch "${PV_LOOP_PATH}" || { echo "[maximize] cannot create ${PV_LOOP_PATH}"; exit 0; }
-          fallocate -z -l "${ROOT_LVM_SIZE_BYTES}" "${PV_LOOP_PATH}" || { echo "[maximize] fallocate failed for root PV"; exit 0; }
-          ROOT_LOOP_DEV=$(losetup --find --show "${PV_LOOP_PATH}") || { echo "[maximize] losetup failed for root PV"; exit 0; }
-          pvcreate -ff -y "${ROOT_LOOP_DEV}" || { echo "[maximize] pvcreate failed for root PV"; exit 0; }
-
-          TMP_RESERVE_KB=$((TEMP_RESERVE_MB * 1024))
-          TMP_FREE_KB=$(df --block-size=1024 --output=avail /mnt | tail -1 | tr -dc '0-9')
-          TMP_LVM_SIZE_KB=$((TMP_FREE_KB - TMP_RESERVE_KB))
-          if [ "$TMP_LVM_SIZE_KB" -le 0 ]; then
-            echo "[maximize] not enough space on /mnt for temp LVM image - skipping"
-            exit 0
-          fi
-          TMP_LVM_SIZE_BYTES=$((TMP_LVM_SIZE_KB * 1024))
-          rm -f "${TMP_PV_LOOP_PATH}" || true
-          touch "${TMP_PV_LOOP_PATH}" || { echo "[maximize] cannot create ${TMP_PV_LOOP_PATH}"; exit 0; }
-          fallocate -z -l "${TMP_LVM_SIZE_BYTES}" "${TMP_PV_LOOP_PATH}" || { echo "[maximize] fallocate failed for temp PV"; exit 0; }
-          TMP_LOOP_DEV=$(losetup --find --show "${TMP_PV_LOOP_PATH}") || { echo "[maximize] losetup failed for temp PV"; exit 0; }
-          pvcreate -ff -y "${TMP_LOOP_DEV}" || { echo "[maximize] pvcreate failed for temp PV"; exit 0; }
-
-          vgcreate -f "${VG_NAME}" "${TMP_LOOP_DEV}" "${ROOT_LOOP_DEV}" || { echo "[maximize] vgcreate failed"; exit 0; }
-          lvcreate -y -L "${SWAP_SIZE_MB}M" -n swap "${VG_NAME}" || { echo "[maximize] lvcreate swap failed"; exit 0; }
-          mkswap "/dev/mapper/${VG_NAME}-swap" || { echo "[maximize] mkswap failed"; exit 0; }
-          swapon "/dev/mapper/${VG_NAME}-swap" || echo "[maximize] swapon failed (continuing)"
-
-          lvcreate -y -l 100%FREE -n buildlv "${VG_NAME}" || { echo "[maximize] lvcreate buildlv failed"; exit 0; }
-          if [ "${OVERPROVISION_LVM}" = "true" ]; then
-            mkfs.ext4 -F -m0 "/dev/mapper/${VG_NAME}-buildlv" || { echo "[maximize] mkfs failed"; exit 0; }
-          else
-            mkfs.ext4 -F -Enodiscard -m0 "/dev/mapper/${VG_NAME}-buildlv" || { echo "[maximize] mkfs failed"; exit 0; }
-          fi
-          mount "/dev/mapper/${VG_NAME}-buildlv" "${BUILD_MOUNT_PATH}" || { echo "[maximize] mount failed"; exit 0; }
-          chown -R "${BUILD_MOUNT_OWNERSHIP}" "${BUILD_MOUNT_PATH}" 2>/dev/null || chown -R "${WORKSPACE_OWNER}" "${BUILD_MOUNT_PATH}" 2>/dev/null || true
-
-          if [ ! -d "${GITHUB_WORKSPACE}" ]; then
-            mkdir -p "${GITHUB_WORKSPACE}" || true
-            chown -R "${WORKSPACE_OWNER}" "${GITHUB_WORKSPACE}" 2>/dev/null || true
-          fi
-
-          echo "== Disk space report after modification =="
-          free -h || true
-          echo
-          swapon --show || true
-          echo
-          df -h || true
-
-      - name: Install prerequisites
-        run: |
-          # Most prerequisites installed in "Prepare container tools"; keep for compatibility.
-          pacman -Sy --noconfirm --needed git sudo python rclone curl
+        uses: easimon/maximize-build-space@master
+        with:
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          remove-codeql: 'true'
+          remove-docker-images: 'true'
+          root-reserve-mb: 4096
+          temp-reserve-mb: 2048
+          swap-size-mb: 1024
+          build-mount-path: ${{ github.workspace }}
 
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -157,19 +46,7 @@ jobs:
       - name: Mark workspace safe for git
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE" || true
-          git config --global --add safe.directory /__w/ErrorOs-Hyper/ErrorOs-Hyper || true
           git config --global --add safe.directory '*' || true
-
-      - name: Set up build environment
-        run: |
-          if [ "$(id -u)" -eq 0 ]; then
-            bash setup.sh
-          elif command -v sudo >/dev/null 2>&1; then
-            sudo bash setup.sh
-          else
-            echo "sudo not found and not running as root" >&2
-            exit 1
-          fi
 
       - name: Write build info
         run: |
@@ -191,20 +68,40 @@ jobs:
             echo "- Input: \`${{ inputs.input_url }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Build ROM
+      - name: Build ROM (Arch Linux container)
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TELEGRAM_GROUP_ID: ${{ secrets.TELEGRAM_GROUP_ID }}
           TELEGRAM_TOPIC_ID: ${{ secrets.TELEGRAM_TOPIC_ID }}
         run: |
+          set -euo pipefail
           chmod -R 777 . || true
-          git config --global --add safe.directory "$GITHUB_WORKSPACE" || true
-          git config --global --add safe.directory '*' || true
-          bash build.sh "$INPUT_URL" "${{ github.repository }}" "xiaomi" "iabi" "${{ secrets.TELEGRAM_BOT_TOKEN }}" "${{ secrets.TELEGRAM_CHAT_ID }}" "${{ secrets.TELEGRAM_GROUP_ID }}" "${{ secrets.TELEGRAM_TOPIC_ID }}" 2>&1 | tee -a build/build.log
+          docker run --rm --privileged \
+            -e INPUT_URL="$INPUT_URL" \
+            -e TELEGRAM_BOT_TOKEN="$TELEGRAM_BOT_TOKEN" \
+            -e TELEGRAM_CHAT_ID="$TELEGRAM_CHAT_ID" \
+            -e TELEGRAM_GROUP_ID="$TELEGRAM_GROUP_ID" \
+            -e TELEGRAM_TOPIC_ID="$TELEGRAM_TOPIC_ID" \
+            -e GITHUB_REPOSITORY="${{ github.repository }}" \
+            -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" \
+            -w "$GITHUB_WORKSPACE" \
+            archlinux:latest \
+            bash -lc '
+              set -euo pipefail
+              echo "[ci] Installing base packages..."
+              pacman -Sy --noconfirm --needed git sudo python rclone curl
+              echo "[ci] Running setup.sh..."
+              if [ "$(id -u)" -eq 0 ]; then bash setup.sh; else sudo bash setup.sh; fi
+              git config --global --add safe.directory "$PWD" || true
+              git config --global --add safe.directory "*" || true
+              echo "[ci] Starting build..."
+              bash build.sh "$INPUT_URL" "$GITHUB_REPOSITORY" "xiaomi" "iabi" "${TELEGRAM_BOT_TOKEN:-}" "${TELEGRAM_CHAT_ID:-}" "${TELEGRAM_GROUP_ID:-}" "${TELEGRAM_TOPIC_ID:-}" 2>&1 | tee -a build/build.log
+            '
 
       - name: Upload ROM to Google Drive
         id: upload_gdrive
+        if: always()
         continue-on-error: true
         env:
           RCLONE_CONF: ${{ secrets.RCLONE_CONF }}
@@ -212,13 +109,26 @@ jobs:
         run: |
           if [ -z "$RCLONE_CONF" ]; then
             echo "Chua cau hinh RCLONE_CONF -> bo qua Google Drive"
-            exit 1
+            exit 0
           fi
 
+          if [ ! -f bin/ddevice/output_zip.txt ]; then
+            echo "Khong thay output_zip.txt -> bo qua Google Drive"
+            exit 0
+          fi
           ROM_ZIP_PATH="out/$(cat bin/ddevice/output_zip.txt)"
           if [ ! -f "$ROM_ZIP_PATH" ]; then
             echo "Khong thay file ROM: $ROM_ZIP_PATH"
-            exit 1
+            exit 0
+          fi
+
+          if ! command -v rclone >/dev/null 2>&1; then
+            echo "Installing rclone..."
+            curl -fsSL https://rclone.org/install.sh | sudo bash || true
+          fi
+          if ! command -v rclone >/dev/null 2>&1; then
+            echo "rclone unavailable -> bo qua Google Drive"
+            exit 0
           fi
 
           DEST="${GDRIVE_DIR:-gdrive:Error OS}"
@@ -231,7 +141,7 @@ jobs:
           LINK=$(rclone link "$DEST/$(basename "$ROM_ZIP_PATH")" 2>/dev/null || true)
           if [ -z "$LINK" ]; then
             echo "Upload xong nhung khong tao duoc link chia se"
-            exit 1
+            exit 0
           fi
 
           echo "Download link (Drive): $LINK"
@@ -242,10 +152,14 @@ jobs:
         id: upload_gofile
         continue-on-error: true
         run: |
+          if [ ! -f bin/ddevice/output_zip.txt ]; then
+            echo "Khong thay output_zip.txt -> bo qua Gofile"
+            exit 0
+          fi
           ROM_ZIP_PATH="out/$(cat bin/ddevice/output_zip.txt)"
           if [ ! -f "$ROM_ZIP_PATH" ]; then
             echo "Khong thay file ROM: $ROM_ZIP_PATH"
-            exit 1
+            exit 0
           fi
 
           echo "Uploading to Gofile.io..."
@@ -263,7 +177,7 @@ jobs:
           GOFILE_LINK=$(echo "$RESPONSE" | grep -oP '(?<="downloadPage":")[^"]+' | head -1 || true)
           if [ -z "$GOFILE_LINK" ]; then
             echo "Gofile upload that bai hoac khong tra ve link"
-            exit 1
+            exit 0
           fi
 
           echo "Download link (Gofile): $GOFILE_LINK"
@@ -274,6 +188,7 @@ jobs:
 
       - name: Send Telegram notification
         if: always()
+        continue-on-error: true
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -296,15 +211,15 @@ jobs:
             exit 0
           fi
 
-          # Robust Python detection (Arch container / partial-failure runs)
           PY_BIN=""
           if command -v python3 >/dev/null 2>&1; then
             PY_BIN="$(command -v python3)"
           elif command -v python >/dev/null 2>&1; then
             PY_BIN="$(command -v python)"
           else
-            echo "[notify] python not found, attempting to install..."
-            pacman -Sy --noconfirm --needed python >/dev/null 2>&1 || true
+            echo "[notify] python not found on host, attempting to install..."
+            sudo apt-get update >/dev/null 2>&1 || true
+            sudo apt-get install -y python3 python3-pip >/dev/null 2>&1 || true
             if command -v python3 >/dev/null 2>&1; then
               PY_BIN="$(command -v python3)"
             elif command -v python >/dev/null 2>&1; then
@@ -317,7 +232,7 @@ jobs:
             exit 0
           fi
 
-          "$PY_BIN" -m pip install --quiet --break-system-packages requests >/dev/null 2>&1 || "$PY_BIN" -m pip install --quiet requests >/dev/null 2>&1 || true
+          "$PY_BIN" -m pip install --quiet requests >/dev/null 2>&1 || true
 
           "$PY_BIN" - << 'PYTHON'
           import os
