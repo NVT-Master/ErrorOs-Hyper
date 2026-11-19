@@ -57,7 +57,14 @@ jobs:
 
       - name: Set up build environment
         run: |
-          sudo bash setup.sh
+          if [ "$(id -u)" -eq 0 ]; then
+            bash setup.sh
+          elif command -v sudo >/dev/null 2>&1; then
+            sudo bash setup.sh
+          else
+            echo "sudo not found and not running as root" >&2
+            exit 1
+          fi
 
       - name: Write build info
         run: |
@@ -86,7 +93,7 @@ jobs:
           TELEGRAM_GROUP_ID: ${{ secrets.TELEGRAM_GROUP_ID }}
           TELEGRAM_TOPIC_ID: ${{ secrets.TELEGRAM_TOPIC_ID }}
         run: |
-          sudo chmod -R 777 .
+          chmod -R 777 . || true
           git config --global --add safe.directory "$GITHUB_WORKSPACE" || true
           git config --global --add safe.directory '*' || true
           bash build.sh "$INPUT_URL" "${{ github.repository }}" "xiaomi" "iabi" "${{ secrets.TELEGRAM_BOT_TOKEN }}" "${{ secrets.TELEGRAM_CHAT_ID }}" "${{ secrets.TELEGRAM_GROUP_ID }}" "${{ secrets.TELEGRAM_TOPIC_ID }}" 2>&1 | tee -a build/build.log
