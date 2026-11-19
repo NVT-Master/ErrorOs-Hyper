@@ -22,6 +22,30 @@ if [ ! -f "${baserom}" ] && [ "$(echo $baserom |grep http)" != "" ]; then
         return 1
     }
 
+    # Resolve actual downloaded file path. Some URLs (proxies/obfuscated) return the
+    # real filename via Content-Disposition, so aria2c may save to a different name
+    # than the URL basename we guessed.
+    rom_resolve_downloaded() {
+        local requested="$1" candidate
+        if rom_zip_ok "$requested"; then
+            echo "$requested"
+            return 0
+        fi
+        # If requested name exists but is not a valid zip, also consider other zips
+        # (aria2c may have completed content-disposition file while requested is stale).
+        for candidate in "$requested" *.zip; do
+            [ -f "$candidate" ] || continue
+            rom_zip_ok "$candidate" && { echo "$candidate"; return 0; }
+        done
+        # Fallback: newest zip in cwd (best effort)
+        candidate=$(ls -1t *.zip 2>/dev/null | head -n 1 || true)
+        if [ -n "$candidate" ] && [ -f "$candidate" ]; then
+            echo "$candidate"
+            return 0
+        fi
+        return 1
+    }
+
     rom_sha256_ok() {
         local file="$1" expected="$2" actual
         [ -z "$expected" ] && return 0
@@ -44,13 +68,19 @@ if [ ! -f "${baserom}" ] && [ "$(echo $baserom |grep http)" != "" ]; then
     }
 
     download_rom_url() {
-        local url="$1" target="$2" attempt
+        local url="$1" target="$2" attempt resolved
         for attempt in 1 2 3; do
             # Lan 1: -c de resume neu con file do dang. Cac lan sau: file da bi
             # nghiem la hong (khong chi thieu byte) nen phai xoa va tai lai tu dau,
             # vi resume tu mot central directory hong se ket thuc ngay lap tuc.
             if [ "$attempt" -gt 1 ]; then
                 rm -f "$target"
+                # If previous attempt saved under a different (content-disposition) name
+                # and it was invalid, remove it so retries don't reuse a bad file.
+                resolved=$(rom_resolve_downloaded "$target" 2>/dev/null || true)
+                if [ -n "$resolved" ] && [ "$resolved" != "$target" ]; then
+                    rm -f "$resolved" "${resolved}.aria2" 2>/dev/null || true
+                fi
             fi
 
             # -c: resume.
@@ -66,7 +96,9 @@ if [ ! -f "${baserom}" ] && [ "$(echo $baserom |grep http)" != "" ]; then
                 --content-disposition -U "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
                 "${url}" || true
 
-            if rom_zip_ok "$target" && rom_sha256_ok "$target" "$rom_sha256_expected"; then
+            resolved=$(rom_resolve_downloaded "$target" 2>/dev/null || true)
+            if [ -n "$resolved" ] && rom_zip_ok "$resolved" && rom_sha256_ok "$resolved" "$rom_sha256_expected"; then
+                ROM_DOWNLOADED_FILE="$resolved"
                 return 0
             fi
             warn "ROM: lan tai $attempt tu $url chua hop le - thu lai"
@@ -79,6 +111,7 @@ if [ ! -f "${baserom}" ] && [ "$(echo $baserom |grep http)" != "" ]; then
     rom_file=$(basename "${baserom%%\?*}")
     rom_mirrors_raw="${ROM_MIRROR_URLS:-}"
     rom_sha256_expected="${ROM_SHA256:-}"
+    ROM_DOWNLOADED_FILE=""
     if [ -n "$rom_mirrors_raw" ]; then
         info "ROM: mirrors bo sung da cau hinh (ROM_MIRROR_URLS)"
     fi
@@ -101,7 +134,7 @@ if [ ! -f "${baserom}" ] && [ "$(echo $baserom |grep http)" != "" ]; then
             IFS="$old_ifs"
             [ -z "$mirror" ] && continue
             warn "ROM: thu mirror: $mirror"
-            rm -f "$rom_file"
+            rm -f "$rom_file" *.aria2 2>/dev/null || true
             if download_rom_url "$mirror" "$rom_file"; then
                 rom_downloaded=1
                 info "ROM: tai thanh cong tu mirror"
@@ -112,13 +145,20 @@ if [ ! -f "${baserom}" ] && [ "$(echo $baserom |grep http)" != "" ]; then
     fi
 
     baserom="$rom_file"
-    if [ -f $work_dir/topaz-ota_full-OS3.0.2.0.WMGCNXM-user-16.0-b487e82659.zip ]; then
+    if [ -n "$ROM_DOWNLOADED_FILE" ] && [ -f "$ROM_DOWNLOADED_FILE" ]; then
+        baserom="$ROM_DOWNLOADED_FILE"
+        if [ "$baserom" != "$rom_file" ]; then
+            info "ROM: da nhan file tu server: $baserom"
+        fi
+    elif [ -f $work_dir/topaz-ota_full-OS3.0.2.0.WMGCNXM-user-16.0-b487e82659.zip ]; then
         baserom="topaz-ota_full-OS3.0.2.0.WMGCNXM-user-16.0-b487e82659.zip"
         info "BASEROM: ${baserom}"
     elif [ -f $work_dir/munch-ota_full-OS2.0.215.0.VLMCNXM-user-15.0-7df6d5ee94.zip ]; then
         baserom="munch-ota_full-OS2.0.215.0.VLMCNXM-user-15.0-7df6d5ee94.zip"
         info "BASEROM: ${baserom}"
-    elif [ "$rom_downloaded" -ne 1 ] || ! rom_zip_ok "${baserom}"; then
+    fi
+
+    if [ "$rom_downloaded" -ne 1 ] || ! rom_zip_ok "${baserom}"; then
         error "Download error! (thieu, hong hoac sai checksum: ${baserom})"
         exit 1
     fi
