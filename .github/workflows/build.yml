@@ -184,9 +184,30 @@ jobs:
             exit 0
           fi
 
-          python3 -m pip install --quiet --break-system-packages requests >/dev/null 2>&1 || python3 -m pip install --quiet requests >/dev/null 2>&1 || true
+          # Robust Python detection (Arch container / partial-failure runs)
+          PY_BIN=""
+          if command -v python3 >/dev/null 2>&1; then
+            PY_BIN="$(command -v python3)"
+          elif command -v python >/dev/null 2>&1; then
+            PY_BIN="$(command -v python)"
+          else
+            echo "[notify] python not found, attempting to install..."
+            pacman -Sy --noconfirm --needed python >/dev/null 2>&1 || true
+            if command -v python3 >/dev/null 2>&1; then
+              PY_BIN="$(command -v python3)"
+            elif command -v python >/dev/null 2>&1; then
+              PY_BIN="$(command -v python)"
+            fi
+          fi
 
-          python3 - << 'PYTHON'
+          if [ -z "$PY_BIN" ]; then
+            echo "[notify] skip: python is unavailable; cannot send Telegram notification"
+            exit 0
+          fi
+
+          "$PY_BIN" -m pip install --quiet --break-system-packages requests >/dev/null 2>&1 || "$PY_BIN" -m pip install --quiet requests >/dev/null 2>&1 || true
+
+          "$PY_BIN" - << 'PYTHON'
           import os
           import glob
           import requests
