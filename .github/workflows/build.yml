@@ -89,8 +89,11 @@ jobs:
             archlinux:latest \
             bash -lc '
               set -euo pipefail
-              echo "[ci] Installing base packages..."
-              pacman -Sy --noconfirm --needed git sudo python rclone curl
+              echo "[ci] Preparing Arch keyring and base packages..."
+              pacman -Sy --noconfirm archlinux-keyring >/dev/null 2>&1 || true
+              pacman-key --init >/dev/null 2>&1 || true
+              pacman-key --populate archlinux >/dev/null 2>&1 || true
+              pacman -Sy --noconfirm --needed git sudo python rclone curl ca-certificates
               echo "[ci] Running setup.sh..."
               if [ "$(id -u)" -eq 0 ]; then bash setup.sh; else sudo bash setup.sh; fi
               git config --global --add safe.directory "$PWD" || true
