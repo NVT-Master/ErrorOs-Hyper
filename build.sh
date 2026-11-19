@@ -73,7 +73,7 @@ if unzip -l "${baserom}" | grep -q "payload.bin"; then
     baserom_type="payload"
     echo $baserom_type > $work_dir/bin/ddevice/romtype.txt
     unpack "Found payload.bin file"
-    super_list="vendor mi_ext odm odm_dlkm system system_dlkm vendor_dlkm product product_dlkm system_ext"
+    super_list="vendor mi_ext mi_product odm odm_dlkm system system_dlkm vendor_dlkm product product_dlkm system_ext"
     unpack "ROM validation passed."
 elif unzip -l "${baserom}" | grep -q "br$"; then
     baserom_type="br"
@@ -179,7 +179,7 @@ elif [[ ${is_base_rom_eu} == true ]]; then
         fi
     done
 
-    super_list="system system_ext product vendor odm mi_ext"
+    super_list="system system_ext product vendor vendor_dlkm system_dlkm odm odm_dlkm mi_ext mi_product"
 fi
 
 for part in ${super_list}; do
@@ -203,6 +203,29 @@ for must in vendor system product; do
         exit 1
     fi
 done
+
+# Chuẩn hoá đường dẫn build.prop: một số ROM trích khác layout.
+IMG_ROOT="$work_dir/build/baserom/images"
+if [ ! -f "$IMG_ROOT/system/system/build.prop" ] && [ -f "$IMG_ROOT/system/build.prop" ]; then
+    mkdir -p "$IMG_ROOT/system/system"
+    ln -sf ../build.prop "$IMG_ROOT/system/system/build.prop" 2>/dev/null || cp -f "$IMG_ROOT/system/build.prop" "$IMG_ROOT/system/system/build.prop"
+    mods "Compat: linked system/system/build.prop -> system/build.prop"
+fi
+if [ ! -f "$IMG_ROOT/system/system/build.prop" ]; then
+    sys_prop_found=$(find "$IMG_ROOT/system" -type f -name build.prop 2>/dev/null | head -n 1)
+    if [ -n "$sys_prop_found" ]; then
+        mkdir -p "$IMG_ROOT/system/system"
+        cp -f "$sys_prop_found" "$IMG_ROOT/system/system/build.prop" 2>/dev/null || true
+        mods "Compat: copied system build.prop from $sys_prop_found"
+    fi
+fi
+if [ ! -f "$IMG_ROOT/vendor/build.prop" ] && [ -f "$IMG_ROOT/vendor/etc/build.prop" ]; then
+    cp -f "$IMG_ROOT/vendor/etc/build.prop" "$IMG_ROOT/vendor/build.prop" 2>/dev/null || true
+fi
+if [ ! -f "$IMG_ROOT/product/etc/build.prop" ] && [ -f "$IMG_ROOT/product/build.prop" ]; then
+    mkdir -p "$IMG_ROOT/product/etc"
+    cp -f "$IMG_ROOT/product/build.prop" "$IMG_ROOT/product/etc/build.prop" 2>/dev/null || true
+fi
 
 # ==================== ROOT SẴN (SukiSU Ultra LKM) ====================
 # Phải chạy TRƯỚC patchpackage.sh: bước đó gọi DISABLE_AVB, tính lại vbmeta

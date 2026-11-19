@@ -3,7 +3,7 @@ source $work_dir/functions.sh
 tools_dir=${work_dir}/bin/$(uname)/$(uname -m)
 export PATH=$(pwd)/bin/$(uname)/$(uname -m)/:$PATH
 
-super_list="vendor mi_ext odm odm_dlkm system system_dlkm vendor_dlkm product product_dlkm system_ext"
+super_list="vendor mi_ext mi_product odm odm_dlkm system system_dlkm vendor_dlkm product product_dlkm system_ext"
 os_type=$(cat $work_dir/bin/ddevice/os_type.txt)
 base_rom_code=$(cat $work_dir/bin/ddevice/base_rom_code.txt)
 androidVER=$(cat $work_dir/bin/ddevice/androidver.txt)
@@ -149,7 +149,7 @@ if [[ "$is_ab_device" == false ]]; then
     GROUP_SIZE=$((superSize - 134217728))
     lpargs="-F --output build/baserom/images/super.img --metadata-size 65536 --super-name super --metadata-slots 2 --block-size 4096 --device super:$superSize --group=qti_dynamic_partitions:$GROUP_SIZE"
 
-    for pname in odm mi_ext system system_ext product vendor; do
+    for pname in ${super_list}; do
         if [ -f "build/baserom/images/${pname}.img" ]; then
             if [[ "$OSTYPE" == "darwin"* ]]; then
                 subsize=$(stat -f%z "build/baserom/images/${pname}.img")

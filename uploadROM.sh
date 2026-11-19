@@ -36,13 +36,23 @@ os_type=$true_os
 # ========================================================
 
 target_out_dir="$work_dir/out/${os_type}_${device_f}_${base_rom_code}"
-mkdir -p "$target_out_dir/images/"
+mkdir -p "$target_out_dir/images/" "$work_dir/out"
 
 repack "Compressing super.img"
+super_src=""
 if [ -f "$work_dir/build/baserom/images/super.img" ]; then
-    zstd --rm $work_dir/build/baserom/images/super.img -o $work_dir/build/baserom/images/super.img.zst > /dev/null 2>&1
+    super_src="$work_dir/build/baserom/images/super.img"
 elif [ -f "$work_dir/build/baserom/super.img" ]; then
-    zstd --rm $work_dir/build/baserom/super.img -o $work_dir/build/baserom/images/super.img.zst > /dev/null 2>&1
+    super_src="$work_dir/build/baserom/super.img"
+fi
+if [ -z "$super_src" ]; then
+    error "Không tìm thấy super.img để đóng gói (packROM có thể đã lỗi)"
+    exit 1
+fi
+zstd --rm "$super_src" -o "$work_dir/build/baserom/images/super.img.zst" >/dev/null 2>&1
+if [ ! -f "$work_dir/build/baserom/images/super.img.zst" ]; then
+    error "Nén super.img.zst thất bại"
+    exit 1
 fi
 
 repack "Generating flashing script"
@@ -78,17 +88,23 @@ mkdir -p "$target_out_dir/META-INF/Data"
 echo "$device_f" > "$target_out_dir/META-INF/Data/DeviceCode"
 repack "Done"
 
-# Định dạng tên file: Error OS_<codename>_<phiên bản os>_<ngày tháng năm>.zip
+# Định dạng tên file output zip
 build_date=$(TZ=Asia/Ho_Chi_Minh date +%d%m%Y_%H%M)
 final_zip_name="Error OS_${device_code}_${base_rom_code}_${build_date}.zip"
 
-find "$target_out_dir" | xargs touch
-pushd "$target_out_dir/" || exit
-zip -r "$work_dir/out/$final_zip_name" ./*
-popd || exit
+find "$target_out_dir" -exec touch -t 200901010000.00 {} + 2>/dev/null || true
+mkdir -p "$work_dir/out"
+pushd "$target_out_dir/" >/dev/null || exit 1
+zip -r "$work_dir/out/$final_zip_name" ./* >/dev/null 2>&1
+zip_rc=$?
+popd >/dev/null || exit 1
+if [ $zip_rc -ne 0 ] || [ ! -f "$work_dir/out/$final_zip_name" ]; then
+    error "Tạo file zip thất bại: $work_dir/out/$final_zip_name"
+    exit 1
+fi
 
 repack "Build completed"
-repack "Output: $(pwd)/out/$final_zip_name"
+repack "Output: $work_dir/out/$final_zip_name"
 
-output_file="out/$final_zip_name"
-echo "$final_zip_name" > $work_dir/bin/ddevice/output_zip.txt
+mkdir -p "$work_dir/bin/ddevice"
+echo "$final_zip_name" > "$work_dir/bin/ddevice/output_zip.txt"
