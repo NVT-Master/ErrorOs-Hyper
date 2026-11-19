@@ -28,20 +28,130 @@ jobs:
       options: --privileged
 
     steps:
+      - name: Prepare container tools
+        run: |
+          set -euo pipefail
+          # Running inside Arch container; install tools needed for space maximization and build.
+          pacman -Sy --noconfirm --needed \
+            sudo git python rclone curl \
+            util-linux procps-ng lvm2 e2fsprogs findutils coreutils grep gawk sed docker
+
       - name: Maximize build space
-        uses: easimon/maximize-build-space@master
-        with:
-          remove-dotnet: 'true'
-          remove-android: 'true'
-          remove-haskell: 'true'
-          remove-codeql: 'true'
-          remove-docker-images: 'true'
-          root-reserve-mb: 4096
-          temp-reserve-mb: 2048
-          swap-size-mb: 1024
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Adapted for containerized Arch job (runs as root in privileged container).
+          # Based on easimon/maximize-build-space behavior.
+
+          ROOT_RESERVE_MB=4096
+          TEMP_RESERVE_MB=2048
+          SWAP_SIZE_MB=1024
+          OVERPROVISION_LVM=false
+          BUILD_MOUNT_PATH="${GITHUB_WORKSPACE}"
+          BUILD_MOUNT_OWNERSHIP="runner:runner"
+          PV_LOOP_PATH="/pv.img"
+          TMP_PV_LOOP_PATH="/mnt/tmp-pv.img"
+          VG_NAME=buildvg
+
+          as_root() {
+            if [ "$(id -u)" -eq 0 ]; then
+              "$@"
+            else
+              sudo "$@"
+            fi
+          }
+
+          echo "== Disk space report before modification =="
+          echo "Memory and swap:"
+          free -h || true
+          echo
+          swapon --show || true
+          echo
+          echo "Available storage:"
+          df -h || true
+          echo
+
+          echo "Removing unwanted software (host paths visible in container, best effort)..."
+          rm -rf /usr/share/dotnet || true
+          rm -rf /usr/local/lib/android || true
+          rm -rf /opt/ghc || true
+          rm -rf /opt/hostedtoolcache/CodeQL || true
+          if command -v docker >/dev/null 2>&1; then
+            docker image prune --all --force >/dev/null 2>&1 || true
+          fi
+          echo "... done"
+
+          WORKSPACE_OWNER="$(stat -c '%U:%G' "${GITHUB_WORKSPACE}" 2>/dev/null || echo root:root)"
+          mkdir -p "${BUILD_MOUNT_PATH}"
+          find "${BUILD_MOUNT_PATH}" -maxdepth 0 ! -empty -exec echo 'WARNING: directory [{}] is not empty, data loss might occur. Content:' \; -exec ls -al "{}" \; || true
+
+          # Reuse temp disk swap if present
+          swapoff -a || true
+          rm -f /mnt/swapfile || true
+
+          echo "Creating LVM volume..."
+          ROOT_RESERVE_KB=$((ROOT_RESERVE_MB * 1024))
+          ROOT_FREE_KB=$(df --block-size=1024 --output=avail / | tail -1 | tr -dc '0-9')
+          ROOT_LVM_SIZE_KB=$((ROOT_FREE_KB - ROOT_RESERVE_KB))
+          if [ "$ROOT_LVM_SIZE_KB" -le 0 ]; then
+            echo "Not enough space on / for root LVM image (free=${ROOT_FREE_KB}KB reserve=${ROOT_RESERVE_KB}KB)" >&2
+            exit 1
+          fi
+          ROOT_LVM_SIZE_BYTES=$((ROOT_LVM_SIZE_KB * 1024))
+          rm -f "${PV_LOOP_PATH}" || true
+          touch "${PV_LOOP_PATH}"
+          fallocate -z -l "${ROOT_LVM_SIZE_BYTES}" "${PV_LOOP_PATH}"
+          ROOT_LOOP_DEV=$(losetup --find --show "${PV_LOOP_PATH}")
+          pvcreate -ff -y "${ROOT_LOOP_DEV}"
+
+          TMP_RESERVE_KB=$((TEMP_RESERVE_MB * 1024))
+          TMP_FREE_KB=$(df --block-size=1024 --output=avail /mnt | tail -1 | tr -dc '0-9')
+          TMP_LVM_SIZE_KB=$((TMP_FREE_KB - TMP_RESERVE_KB))
+          if [ "$TMP_LVM_SIZE_KB" -le 0 ]; then
+            echo "Not enough space on /mnt for temp LVM image (free=${TMP_FREE_KB}KB reserve=${TMP_RESERVE_KB}KB)" >&2
+            exit 1
+          fi
+          TMP_LVM_SIZE_BYTES=$((TMP_LVM_SIZE_KB * 1024))
+          rm -f "${TMP_PV_LOOP_PATH}" || true
+          touch "${TMP_PV_LOOP_PATH}"
+          fallocate -z -l "${TMP_LVM_SIZE_BYTES}" "${TMP_PV_LOOP_PATH}"
+          TMP_LOOP_DEV=$(losetup --find --show "${TMP_PV_LOOP_PATH}")
+          pvcreate -ff -y "${TMP_LOOP_DEV}"
+
+          vgcreate -f "${VG_NAME}" "${TMP_LOOP_DEV}" "${ROOT_LOOP_DEV}"
+
+          echo "Recreating swap (${SWAP_SIZE_MB}M)..."
+          lvcreate -y -L "${SWAP_SIZE_MB}M" -n swap "${VG_NAME}"
+          mkswap "/dev/mapper/${VG_NAME}-swap"
+          swapon "/dev/mapper/${VG_NAME}-swap"
+
+          echo "Creating and mounting build volume at ${BUILD_MOUNT_PATH}..."
+          lvcreate -y -l 100%FREE -n buildlv "${VG_NAME}"
+          if [ "${OVERPROVISION_LVM}" = "true" ]; then
+            mkfs.ext4 -F -m0 "/dev/mapper/${VG_NAME}-buildlv"
+          else
+            mkfs.ext4 -F -Enodiscard -m0 "/dev/mapper/${VG_NAME}-buildlv"
+          fi
+          mount "/dev/mapper/${VG_NAME}-buildlv" "${BUILD_MOUNT_PATH}"
+          chown -R "${BUILD_MOUNT_OWNERSHIP}" "${BUILD_MOUNT_PATH}" || chown -R "${WORKSPACE_OWNER}" "${BUILD_MOUNT_PATH}" || true
+
+          if [ ! -d "${GITHUB_WORKSPACE}" ]; then
+            mkdir -p "${GITHUB_WORKSPACE}"
+            chown -R "${WORKSPACE_OWNER}" "${GITHUB_WORKSPACE}" || true
+          fi
+
+          echo "== Disk space report after modification =="
+          echo "Memory and swap:"
+          free -h || true
+          echo
+          swapon --show || true
+          echo
+          echo "Available storage:"
+          df -h || true
 
       - name: Install prerequisites
         run: |
+          # Most prerequisites installed in "Prepare container tools"; keep for compatibility.
           pacman -Sy --noconfirm --needed git sudo python rclone curl
 
       - name: Checkout repository
