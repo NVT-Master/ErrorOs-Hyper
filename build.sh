@@ -27,9 +27,9 @@ else
     status="Official"
 fi
 
-# Fix lỗi cấu hình gói apt/dpkg và cài đặt các phụ thuộc cần thiết
-sudo dpkg --configure -a 2>/dev/null || true
-sudo pacman -S --noconfirm --needed xmlstarlet erofs-utils e2fsprogs brotli zstd bc
+# Ensure core build deps (Arch)
+if command -v sudo >/dev/null 2>&1 && [ "$(id -u)" -ne 0 ]; then SUDO=sudo; else SUDO=""; fi
+$SUDO pacman -S --noconfirm --needed xmlstarlet erofs-utils e2fsprogs brotli zstd bc 2>/dev/null || true
 
 check unzip aria2c 7z zip java python3 zstd bc xmlstarlet
 
