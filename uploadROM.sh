@@ -86,6 +86,36 @@ fi
 
 mkdir -p "$target_out_dir/META-INF/Data"
 echo "$device_f" > "$target_out_dir/META-INF/Data/DeviceCode"
+
+# Build manifest for traceability (inside flash package and in build logs)
+manifest_file="$target_out_dir/build_manifest.txt"
+{
+    echo "ErrorOS-Hyper Build Manifest"
+    echo "generated_at=$(TZ=Asia/Ho_Chi_Minh date '+%Y-%m-%d %H:%M:%S %z' 2>/dev/null || date -u '+%Y-%m-%dT%H:%M:%SZ')"
+    echo "device_f=${device_f}"
+    echo "device_code=${device_code}"
+    echo "base_rom_code=${base_rom_code}"
+    echo "android_version=${androidVER}"
+    echo "rom_os=${rom_os}"
+    echo "region=${regionTYPE}"
+    echo "os_type=${os_type}"
+    echo "baserom_type=${baserom_type}"
+    echo "version=${polyxver}"
+    echo "status=${status}"
+    echo "git_commit=$(git -C "$work_dir" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+    echo "git_branch=$(git -C "$work_dir" branch --show-current 2>/dev/null || echo unknown)"
+    echo "toolbox_mode=$(grep -m1 '^toolbox_mode=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d '\r\n')"
+    echo "sukisu=$(grep -m1 '^sukisu=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d '\r\n')"
+    echo "fcm_boot_apply=$(grep -m1 '^fcm_boot_apply=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d '\r\n')"
+    echo "power_tune_bglimit=$(grep -m1 '^power_tune_bglimit=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d '\r\n')"
+    echo "cpu_freq_cap_enable=$(grep -m1 '^cpu_freq_cap_enable=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d '\r\n')"
+    echo "cpu_freq_cap_percent=$(grep -m1 '^cpu_freq_cap_percent=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d '\r\n')"
+    echo "donor_import_enable=$(grep -m1 '^donor_import_enable=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d '\r\n')"
+} > "$manifest_file" 2>/dev/null || true
+cp -f "$manifest_file" "$target_out_dir/META-INF/Data/build_manifest.txt" 2>/dev/null || true
+mkdir -p "$work_dir/bin/ddevice"
+cp -f "$manifest_file" "$work_dir/bin/ddevice/build_manifest.txt" 2>/dev/null || true
+
 repack "Done"
 
 # Định dạng tên file output zip

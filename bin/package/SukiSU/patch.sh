@@ -93,13 +93,16 @@ fetch() {
 }
 
 KSUSD="$CACHE/ksud"
-APK_NAME="SukiSU_v${SUKISU_VER}_${SUKISU_BUILD}-release.apk"
-APK="$CACHE/$APK_NAME"
+
+# Manager APK: cho phép override để tránh build gãy khi upstream đổi tên/tag asset.
+SUKISU_MANAGER_URL=$(grep -m1 '^sukisu_manager_url=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2- | tr -d '\r\n')
+SUKISU_MANAGER_PATH=$(grep -m1 '^sukisu_manager_path=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2- | tr -d '\r\n')
+APK_NAME_DEFAULT="SukiSU_v${SUKISU_VER}_${SUKISU_BUILD}-release.apk"
+APK="$CACHE/$APK_NAME_DEFAULT"
+MANAGER_OK=0
 
 fetch "$KSUD_BASE/ksud-x86_64-unknown-linux-musl" "$KSUSD" 5000000 || { error "SukiSU: không tải được ksud host"; exit 1; }
-fetch "$BASE/$APK_NAME" "$APK" 10000000 || { error "SukiSU: không tải được manager APK ($APK_NAME)"; exit 1; }
 chmod 0755 "$KSUSD"
-mods "SukiSU: manager $APK_NAME"
 
 # ---------------------------------------------------------------------------
 # Dò KMI: kernel báo "6.6.118-android15-8-g0908354dac1b-ab...-4k", KMI của
@@ -219,6 +222,93 @@ cp -f "$BOOT" "$CACHE/boot.img.stock"
 cp -f "$OUT" "$BOOT"
 mods "SukiSU: boot.img đã vá - $out_sz byte (gốc $stock_sz)"
 
+# ---- Manager APK (best-effort, không được làm hỏng root kernel patch) ----
+obtain_manager_apk() {
+    local cand url name dl_url dl_name
+    MANAGER_OK=0
+
+    # Local override path from config.env (relative to work_dir or absolute)
+    if [ -n "$SUKISU_MANAGER_PATH" ]; then
+        cand="$SUKISU_MANAGER_PATH"
+        case "$cand" in /*) ;; *) cand="$work_dir/$cand" ;; esac
+        if [ -s "$cand" ]; then
+            cp -f "$cand" "$APK" && MANAGER_OK=1 && mods "SukiSU: dùng manager APK local: $cand"
+            return 0
+        fi
+        warn "SukiSU: sukisu_manager_path không tồn tại/hợp lệ: $SUKISU_MANAGER_PATH"
+    fi
+
+    # Explicit URL override
+    if [ -n "$SUKISU_MANAGER_URL" ]; then
+        name=$(basename "${SUKISU_MANAGER_URL%%\?*}")
+        [ -z "$name" ] && name="$APK_NAME_DEFAULT"
+        APK="$CACHE/$name"
+        if fetch "$SUKISU_MANAGER_URL" "$APK" 10000000; then
+            MANAGER_OK=1
+            mods "SukiSU: tải manager từ sukisu_manager_url ($name)"
+            return 0
+        fi
+        warn "SukiSU: không tải được manager từ sukisu_manager_url"
+    fi
+
+    # Default filename on configured release
+    APK="$CACHE/$APK_NAME_DEFAULT"
+    if fetch "$BASE/$APK_NAME_DEFAULT" "$APK" 10000000; then
+        MANAGER_OK=1
+        mods "SukiSU: manager $APK_NAME_DEFAULT"
+        return 0
+    fi
+    warn "SukiSU: không tải được manager APK mặc định ($APK_NAME_DEFAULT)"
+
+    # Try to discover a release APK asset name via GitHub API (best-effort)
+    if command -v curl >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+        url=$(curl -fsSL --connect-timeout 20 --max-time 40 \
+            "https://api.github.com/repos/SukiSU-Ultra/SukiSU-Ultra/releases/tags/v${SUKISU_VER}" 2>/dev/null \
+            | python3 -c 'import json,sys
+try:
+    d=json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+assets=d.get("assets") or []
+def score(n):
+    n=n.lower(); s=0
+    if n.endswith(".apk"): s+=10
+    if "release" in n: s+=5
+    if "arm64" in n or "aarch64" in n or "universal" in n: s+=2
+    if "manager" in n or "sukisu" in n: s+=1
+    if "debug" in n: s-=5
+    return s
+best=None; bs=-999
+for a in assets:
+    n=a.get("name",""); u=a.get("browser_download_url","")
+    if not n.endswith(".apk") or not u: continue
+    sc=score(n)
+    if sc>bs: bs=sc; best=(n,u)
+if best:
+    print(best[1])
+    print(best[0])
+' 2>/dev/null || true)
+        if [ -n "$url" ]; then
+            dl_url=$(printf '%s\n' "$url" | sed -n '1p')
+            dl_name=$(printf '%s\n' "$url" | sed -n '2p')
+            [ -z "$dl_name" ] && dl_name=$(basename "${dl_url%%\?*}")
+            if [ -n "$dl_url" ]; then
+                APK="$CACHE/$dl_name"
+                if fetch "$dl_url" "$APK" 10000000; then
+                    MANAGER_OK=1
+                    mods "SukiSU: tải manager từ release asset ($dl_name)"
+                    return 0
+                fi
+            fi
+        fi
+    fi
+
+    warn "SukiSU: không lấy được manager APK. Boot đã được vá root; có thể cài manager sau (Toolbox/OTA) hoặc đặt sukisu_manager_url/sukisu_manager_path trong config.env."
+    return 1
+}
+
+obtain_manager_apk || true
+
 # Manager: product/app để PackageManager luôn thấy. product/data-app phụ thuộc
 # PreinstallApp của MIUI chạy đúng.
 #
@@ -241,6 +331,8 @@ if [ "$PREINSTALL" != "true" ]; then
     # Không cài sẵn app: người dùng mở Root Toolbox bấm "Cài". Kernel trong
     # boot.img vẫn có root sẵn, chỉ là chưa có manager nào để nói chuyện.
     mods "SukiSU: không cài sẵn manager (sukisu_preinstall_manager=false) - Root Toolbox lo"
+elif [ "${MANAGER_OK:-0}" -ne 1 ] || [ ! -s "$APK" ]; then
+    warn "SukiSU: bỏ qua cài sẵn manager vì không có APK hợp lệ (kernel root vẫn đã được vá)"
 elif [ -d "$IMG/product" ]; then
     mkdir -p "$APP_DIR"
     cp -f "$APK" "$APP_DIR/SukiSUUltra.apk"
@@ -296,6 +388,8 @@ INSTALL_SH="$IMG/system_ext/bin/erroros_sukisu_manager.sh"
 INSTALL_RC="$IMG/system_ext/etc/init/init.erroros.sukisu.rc"
 if [ "$PREINSTALL" != "true" ]; then
     mods "SukiSU: bỏ qua service tự cài manager (đã tắt preinstall)"
+elif [ "${MANAGER_OK:-0}" -ne 1 ] || [ ! -s "$APK" ]; then
+    mods "SukiSU: bỏ qua service tự cài manager (thiếu manager APK)"
 elif [ -d "$IMG/system_ext" ]; then
     mkdir -p "$(dirname "$INSTALL_SH")" "$(dirname "$INSTALL_RC")"
 
@@ -388,5 +482,5 @@ else
     warn "SukiSU: không thấy system_ext/ - manager chỉ nằm ở /product/app và sẽ báo 'chưa cài đặt'"
 fi
 
-mods "SukiSU: xong - kernel có root sẵn; manager do Root Toolbox cài khi người dùng bấm"
+mods "SukiSU: xong - kernel đã được vá root (manager: best-effort)"
 exit 0

@@ -1,134 +1,111 @@
-﻿name: Error OS ROM Build
+name: Error OS ROM Build
 
 on:
   workflow_dispatch:
     inputs:
       input_url:
-        description: 'URL'
+        description: 'Direct download link (ZIP) or source file path'
         required: true
+        type: string
       toolbox_mode:
-        description: 'Toolbox trong Settings: root = có root + Error OS Toolbox; kaorios = không root + Kaorios Toolbox'
+        description: 'root = ROM root (SukiSU) + Error OS Toolbox; kaorios = no root + Kaorios Toolbox'
+        required: true
         type: choice
         options:
           - root
           - kaorios
         default: root
 
+env:
+  INPUT_URL: ${{ inputs.input_url }}
+
 jobs:
-  Initialize:
+  build:
+    name: Initialize
     runs-on: ubuntu-latest
-    container: archlinux:latest
-    env:
-      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-      TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
-      TELEGRAM_GROUP_ID: ${{ secrets.TELEGRAM_GROUP_ID }}
-      BUILDER_NAME: "iabi"
-      BUILDER_ID: ${{ secrets.TELEGRAM_OWNER_ID }}
+    container:
+      image: archlinux:latest
+      options: --privileged
 
     steps:
-      - name: Free runner space + pacman base
-        run: |
-          pacman -Syu --noconfirm --needed git tar sudo ca-certificates
-          rm -rf /usr/share/dotnet /opt/ghc /opt/microsoft /usr/local/.ghcup \
-                 /usr/lib/mono /opt/az /usr/share/swift /usr/local/share/boost || true
-          pacman -Scc --noconfirm || true
-          df -h /
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@master
+        with:
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          remove-codeql: 'true'
+          remove-docker-images: 'true'
+          root-reserve-mb: 4096
+          temp-reserve-mb: 2048
+          swap-size-mb: 1024
 
-      - name: Free runner space
+      - name: Install prerequisites
         run: |
-          rm -rf /opt/ghc /usr/share/swift /usr/local/share/boost /opt/microsoft /usr/local/.ghcup /usr/lib/mono || true
-          df -h /
+          pacman -Sy --noconfirm --needed git sudo python rclone curl
 
       - name: Checkout repository
-        uses: actions/checkout@main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Show disk space
+      - name: Mark workspace safe for git
         run: |
-          df -h
-          df -h "$GITHUB_WORKSPACE"
-          lsblk -o NAME,SIZE,TYPE,MOUNTPOINT
+          git config --global --add safe.directory "$GITHUB_WORKSPACE" || true
+          git config --global --add safe.directory /__w/ErrorOs-Hyper/ErrorOs-Hyper || true
+          git config --global --add safe.directory '*' || true
 
-      - name: Set up timezone
-        run: ln -sf /usr/share/zoneinfo/Asia/Ho_Chi_Minh /etc/localtime
-
-      - name: Install JDK
-        run: pacman -S --noconfirm --needed jdk-openjdk
-
-      - name: Install Stuff
-        run: bash setup.sh
-
-      - name: Giving permission
-        run: chmod 777 -R *
-
-      - name: Build prop-fix helper
+      - name: Set up build environment
         run: |
-          set -e
-          SRC="bin/package/ErrorOSPropFix/erroros_propfix.c"
-          OUT="bin/package/ErrorOSPropFix/erroros_propfix"
-          if [ ! -f "$SRC" ]; then
-            echo "Không có $SRC - bỏ qua"
-            exit 0
-          fi
+          sudo bash setup.sh
 
-          # Không dùng NDK: binary chỉ cần libc chuẩn, cross-gcc của Arch Linux
-          # (aarch64-linux-gnu-gcc) là đủ và tĩnh hoàn toàn, tự chứa.
-          pacman -S --noconfirm --needed aarch64-linux-gnu-gcc aarch64-linux-gnu-glibc
-          CC=aarch64-linux-gnu-gcc
-          "$CC" --version | head -1
-          echo "sysroot: $($CC -print-sysroot)"
-
-          gcc -O1 -Wall -DERROROS_SELFTEST -o /tmp/propfix_selftest "$SRC"
-          /tmp/propfix_selftest --selftest
-
-          "$CC" -Os -Wall -fno-stack-protector -static -no-pie -s -o "$OUT" "$SRC"
-          file "$OUT"
-          ls -la "$OUT"
-
-      - name: Apply toolbox mode
+      - name: Write build info
         run: |
-          MODE="${{ inputs.toolbox_mode }}"
-          if [ -z "$MODE" ]; then MODE=root; fi
-          case "$MODE" in
-            root|kaorios) ;;
-            *) echo "toolbox_mode không hợp lệ: $MODE"; exit 1 ;;
-          esac
-          if grep -q '^toolbox_mode=' config.env; then
-            sed -i "s/^toolbox_mode=.*/toolbox_mode=$MODE/" config.env
-          else
-            echo "toolbox_mode=$MODE" >> config.env
-          fi
-          echo "--- toolbox_mode trong config.env ---"
-          grep -n '^toolbox_mode=' config.env
+          mkdir -p out build
+          {
+            echo "workflow=Error OS ROM Build"
+            echo "run_id=${GITHUB_RUN_ID}"
+            echo "run_attempt=${GITHUB_RUN_ATTEMPT}"
+            echo "sha=${GITHUB_SHA}"
+            echo "ref=${GITHUB_REF}"
+            echo "toolbox_mode=${{ inputs.toolbox_mode }}"
+            echo "input_url=${{ inputs.input_url }}"
+            echo "started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > build/ci_build_info.txt
+          {
+            echo "## Build info"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Toolbox mode: \`${{ inputs.toolbox_mode }}\`"
+            echo "- Input: \`${{ inputs.input_url }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Build ROM...
-        timeout-minutes: 180
+      - name: Build ROM
         env:
-          INPUT_URL: ${{ inputs.input_url }}
-        run: bash build.sh "$INPUT_URL" "${{ github.repository }}" "xiaomi" "${{ env.BUILDER_NAME }}" "${{ env.BUILDER_ID }}"
-
-      - name: Pack ROM...
-        timeout-minutes: 60
-        run: bash packROM.sh
-
-      - name: Upload ROM...
-        run: bash uploadROM.sh
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_GROUP_ID: ${{ secrets.TELEGRAM_GROUP_ID }}
+          TELEGRAM_TOPIC_ID: ${{ secrets.TELEGRAM_TOPIC_ID }}
+        run: |
+          sudo chmod -R 777 .
+          git config --global --add safe.directory "$GITHUB_WORKSPACE" || true
+          git config --global --add safe.directory '*' || true
+          bash build.sh "$INPUT_URL" "${{ github.repository }}" "xiaomi" "iabi" "${{ secrets.TELEGRAM_BOT_TOKEN }}" "${{ secrets.TELEGRAM_CHAT_ID }}" "${{ secrets.TELEGRAM_GROUP_ID }}" "${{ secrets.TELEGRAM_TOPIC_ID }}" 2>&1 | tee -a build/build.log
 
       - name: Upload ROM to Google Drive
-        id: drive
-        if: success()
+        id: upload_gdrive
         continue-on-error: true
         env:
           RCLONE_CONF: ${{ secrets.RCLONE_CONF }}
           GDRIVE_DIR: ${{ secrets.GDRIVE_DIR }}
         run: |
           if [ -z "$RCLONE_CONF" ]; then
-            echo "Chưa cấu hình RCLONE_CONF -> bỏ qua Google Drive"
+            echo "Chua cau hinh RCLONE_CONF -> bo qua Google Drive"
             exit 1
           fi
 
           ROM_ZIP_PATH="out/$(cat bin/ddevice/output_zip.txt)"
           if [ ! -f "$ROM_ZIP_PATH" ]; then
-            echo "Không thấy file ROM: $ROM_ZIP_PATH"
+            echo "Khong thay file ROM: $ROM_ZIP_PATH"
             exit 1
           fi
 
@@ -136,12 +113,12 @@ jobs:
           mkdir -p "$HOME/.config/rclone"
           printf '%s\n' "$RCLONE_CONF" > "$HOME/.config/rclone/rclone.conf"
 
-          echo "Upload lên Google Drive: $DEST"
+          echo "Upload len Google Drive: $DEST"
           rclone copy "$ROM_ZIP_PATH" "$DEST" --drive-chunk-size 256M --retries 3 --low-level-retries 10 --stats 30s --stats-one-line
 
           LINK=$(rclone link "$DEST/$(basename "$ROM_ZIP_PATH")" 2>/dev/null || true)
           if [ -z "$LINK" ]; then
-            echo "Upload xong nhưng không tạo được link chia sẻ"
+            echo "Upload xong nhung khong tao duoc link chia se"
             exit 1
           fi
 
@@ -149,67 +126,194 @@ jobs:
           echo "DOWNLOAD_LINK=$LINK" >> "$GITHUB_ENV"
 
       - name: Upload ROM to Gofile.io
-        if: success()  # Gofile always mirrors Drive (not only as fallback)
+        if: success()
+        id: upload_gofile
         continue-on-error: true
-        env:
-          GOFILE_TOKEN: ${{ secrets.GOFILE_TOKEN }}
         run: |
-          set +e
           ROM_ZIP_PATH="out/$(cat bin/ddevice/output_zip.txt)"
           if [ ! -f "$ROM_ZIP_PATH" ]; then
-            echo "Không thấy file ROM: $ROM_ZIP_PATH"
+            echo "Khong thay file ROM: $ROM_ZIP_PATH"
             exit 1
           fi
 
-          df -h /
-          free -h
-
-          SERVER=$(curl -fsS --max-time 60 https://api.gofile.io/servers | jq -r '.data.servers[0].name')
-          if [ -z "$SERVER" ] || [ "$SERVER" = "null" ]; then
-            echo "Không lấy được Gofile server"
-            exit 1
-          fi
-          echo "Gofile server: $SERVER"
-
-          AUTH=()
-          if [ -n "$GOFILE_TOKEN" ]; then
-            AUTH=(-F "token=${GOFILE_TOKEN}")
+          echo "Uploading to Gofile.io..."
+          SERVER=$(curl -fsS https://api.gofile.io/servers 2>/dev/null | grep -oP '(?<="server":")[^"]+' | head -1 || true)
+          if [ -z "$SERVER" ]; then
+            SERVER="store1"
+            echo "Using fallback Gofile server: $SERVER"
+          else
+            echo "Using Gofile server: $SERVER"
           fi
 
-          LINK=""
-          for i in 1 2 3; do
-            RES=$(curl -sS --max-time 3600 "${AUTH[@]}" \
-                  -F "file=@${ROM_ZIP_PATH}" "https://${SERVER}.gofile.io/contents/uploadfile") || RES=""
-            echo "Lần $i: status=$(echo "$RES" | jq -r '.status' 2>/dev/null)"
-            LINK=$(echo "$RES" | jq -r '.data.downloadPage // empty' 2>/dev/null)
-            if [ -n "$LINK" ]; then
-              break
-            fi
-            sleep 10
-          done
+          RESPONSE=$(curl -fsS -F "file=@$ROM_ZIP_PATH" "https://$SERVER.gofile.io/uploadFile" || true)
+          echo "Gofile response: $RESPONSE"
 
-          if [ -z "$LINK" ]; then
-            echo "Upload Gofile thất bại"
+          GOFILE_LINK=$(echo "$RESPONSE" | grep -oP '(?<="downloadPage":")[^"]+' | head -1 || true)
+          if [ -z "$GOFILE_LINK" ]; then
+            echo "Gofile upload that bai hoac khong tra ve link"
             exit 1
           fi
 
-          echo "Upload thành công! Link tải: $LINK"
-          echo "DOWNLOAD_LINK_GOFILE=$LINK" >> "$GITHUB_ENV"
+          echo "Download link (Gofile): $GOFILE_LINK"
+          echo "GOFILE_LINK=$GOFILE_LINK" >> "$GITHUB_ENV"
+          if [ -z "${DOWNLOAD_LINK:-}" ]; then
+            echo "DOWNLOAD_LINK=$GOFILE_LINK" >> "$GITHUB_ENV"
+          fi
 
-      - name: Success Notification
-        if: success()
-        continue-on-error: true
+      - name: Send Telegram notification
+        if: always()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_GROUP_ID: ${{ secrets.TELEGRAM_GROUP_ID }}
+          TELEGRAM_TOPIC_ID: ${{ secrets.TELEGRAM_TOPIC_ID }}
         run: |
-          pacman -S --noconfirm --needed python-requests
-          python notify.py success "${{ github.repository }}" "${{ inputs.input_url }}" "xiaomi" "${{ env.BUILDER_NAME }}" "${{ env.BUILDER_ID }}"
+          set -euo pipefail
+          mkdir -p build
+          NOTIFY_LOG="build/telegram_notify.log"
+          exec > >(tee -a "$NOTIFY_LOG") 2>&1
 
-      - name: Failure Notification
+          echo "[notify] === Telegram notify start ==="
+          echo "[notify] time=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          echo "[notify] job_status=${{ job.status }}"
+          echo "[notify] DOWNLOAD_LINK=${DOWNLOAD_LINK:-<empty>}"
+          echo "[notify] GOFILE_LINK=${GOFILE_LINK:-<empty>}"
+
+          if [ -z "${TELEGRAM_BOT_TOKEN:-}" ]; then
+            echo "[notify] skip: TELEGRAM_BOT_TOKEN is not set"
+            exit 0
+          fi
+
+          python3 -m pip install --quiet --break-system-packages requests >/dev/null 2>&1 || python3 -m pip install --quiet requests >/dev/null 2>&1 || true
+
+          python3 - << 'PYTHON'
+          import os
+          import glob
+          import requests
+
+          bot_token = (os.environ.get('TELEGRAM_BOT_TOKEN') or '').strip()
+          chat_id = (os.environ.get('TELEGRAM_CHAT_ID') or '').strip()
+          group_id = (os.environ.get('TELEGRAM_GROUP_ID') or '').strip()
+          topic_id = (os.environ.get('TELEGRAM_TOPIC_ID') or '').strip()
+          download_link = (os.environ.get('DOWNLOAD_LINK') or '').strip()
+          gofile_link = (os.environ.get('GOFILE_LINK') or '').strip()
+
+          def read_first(path):
+              try:
+                  with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+                      return f.read().strip()
+              except Exception:
+                  return ''
+
+          device_code = read_first('bin/ddevice/device_code.txt') or 'N/A'
+          device_name = read_first('bin/ddevice/device_name.txt') or device_code
+          rom_version = read_first('bin/ddevice/rom_version.txt') or 'N/A'
+          android_ver = read_first('bin/ddevice/androidver.txt') or 'N/A'
+          region = read_first('bin/ddevice/device_type.txt') or 'N/A'
+          chip = read_first('bin/ddevice/platform.txt') or 'N/A'
+          security_patch = read_first('bin/ddevice/security_patch.txt') or 'N/A'
+
+          zip_name = ''
+          out_dir = os.path.join('out')
+          if os.path.isdir(out_dir):
+              files = sorted(glob.glob(os.path.join(out_dir, '*.zip')), key=os.path.getmtime, reverse=True)
+              if files:
+                  zip_name = os.path.basename(files[0])
+
+          caption = (
+              f"Device: {device_name} ({device_code})\n"
+              f"ROM: {rom_version}\n"
+              f"Android: {android_ver} | Region: {region}\n"
+              f"Chip: {chip} | Security: {security_patch}\n"
+          )
+          if zip_name:
+              caption += f"File: {zip_name}\n"
+          if download_link:
+              caption += f"Drive: {download_link}\n"
+          if gofile_link:
+              caption += f"Gofile: {gofile_link}\n"
+          if not download_link and not gofile_link:
+              caption += "Build completed but no download link available.\n"
+
+          def send(target_chat_id, use_topic=False):
+              if not target_chat_id:
+                  print(f"[notify:skip] missing chat id (topic={use_topic})")
+                  return False
+              payload = {'chat_id': target_chat_id, 'caption': caption[:1024]}
+              if use_topic and topic_id:
+                  payload['message_thread_id'] = topic_id
+              photo_candidates = sorted(glob.glob('*.jpg') + glob.glob('*.jpeg') + glob.glob('*.png'))
+              try:
+                  if photo_candidates:
+                      with open(photo_candidates[0], 'rb') as photo:
+                          r = requests.post(
+                              f'https://api.telegram.org/bot{bot_token}/sendPhoto',
+                              data=payload,
+                              files={'photo': photo},
+                              timeout=30,
+                          )
+                  else:
+                      payload['text'] = caption[:4096]
+                      r = requests.post(
+                          f'https://api.telegram.org/bot{bot_token}/sendMessage',
+                          data=payload,
+                          timeout=30,
+                      )
+                  print(f"[notify:{'group' if use_topic else 'main'}] status={r.status_code} body={r.text[:300]}")
+                  return r.ok
+              except Exception as e:
+                  print(f"[notify:{'group' if use_topic else 'main'}] error={e}")
+                  return False
+
+          ok_main = send(chat_id, use_topic=False)
+          ok_group = send(group_id, use_topic=True) if group_id else None
+          if ok_main is False:
+              raise SystemExit(1)
+          if group_id and ok_group is False:
+              print('[notify] group notification failed, but main notification succeeded')
+          PYTHON
+
+      - name: Finalize build summary
+        if: always()
+        run: |
+          {
+            echo "## Build result"
+            echo "- Job status: \`${{ job.status }}\`"
+            if [ -f bin/ddevice/output_zip.txt ]; then echo "- Output: \`$(cat bin/ddevice/output_zip.txt)\`"; fi
+            if [ -n "${DOWNLOAD_LINK:-}" ]; then echo "- Drive: ${DOWNLOAD_LINK}"; fi
+            if [ -n "${GOFILE_LINK:-}" ]; then echo "- Gofile: ${GOFILE_LINK}"; fi
+          } >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Upload diagnostics on failure
         if: failure()
-        continue-on-error: true
-        run: |
-          pacman -S --noconfirm --needed python-requests
-          python notify.py fail "${{ github.repository }}" "${{ inputs.input_url }}" "xiaomi" "${{ env.BUILDER_NAME }}" "${{ env.BUILDER_ID }}"
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: warn
+          retention-days: 7
+          path: |
+            build/build.log
+            build/ci_build_info.txt
+            build/telegram_notify.log
+            bin/ddevice/*.txt
+            bin/ddevice/romtype.txt
+            config.env
+
+      - name: Upload build metadata
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-metadata-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: warn
+          retention-days: 7
+          path: |
+            build/ci_build_info.txt
+            bin/ddevice/output_zip.txt
+            bin/ddevice/*.txt
 
       - name: Cleanup
         if: always()
-        run: rm -rf out build
+        run: |
+          # Keep lightweight metadata if artifacts step failed early; heavy dirs removed.
+          rm -rf out build/baserom 2>/dev/null || true
+          find build -maxdepth 1 -type f \( -name '*.img' -o -name '*.img.*' \) -delete 2>/dev/null || true

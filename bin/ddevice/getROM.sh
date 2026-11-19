@@ -3,12 +3,13 @@
 baserom="$1"
 work_dir=$(pwd)
 source $work_dir/functions.sh
+
 # Check whether it is a local package or a link
 if [ ! -f "${baserom}" ] && [ "$(echo $baserom |grep http)" != "" ]; then
     info "Download link detected, starting a download..."
 
     # Kiem tra file tai ve co dung la mot zip hoan chinh khong.
-    # unzip -t (Info-ZIP) FAIL VOI ZIP SIGNADPK LON (~8 GB) - download OK nhung
+    # unzip -t (Info-ZIP) FAIL VOI ZIP SIGNED/APK LON (~8 GB) - download OK nhung
     # -t bao loi -> build sai "file hong". Dung listing (unzip -l / 7z l) nhu
     # buoc runtime cua build.sh dung, thua du kiem central directory.
     rom_zip_ok() {
@@ -21,38 +22,94 @@ if [ ! -f "${baserom}" ] && [ "$(echo $baserom |grep http)" != "" ]; then
         return 1
     }
 
+    rom_sha256_ok() {
+        local file="$1" expected="$2" actual
+        [ -z "$expected" ] && return 0
+        expected=$(echo "$expected" | tr 'A-F' 'a-f' | tr -d ' \r\n\t')
+        if ! command -v sha256sum >/dev/null 2>&1; then
+            warn "ROM: sha256sum khong kha dung, bo qua kiem tra SHA256"
+            return 0
+        fi
+        actual=$(sha256sum "$file" 2>/dev/null | awk '{print $1}' | tr 'A-F' 'a-f')
+        if [ -z "$actual" ]; then
+            warn "ROM: khong tinh duoc SHA256 cho $file"
+            return 1
+        fi
+        if [ "$actual" = "$expected" ]; then
+            info "ROM: SHA256 hop le"
+            return 0
+        fi
+        warn "ROM: SHA256 sai (expected=$expected actual=$actual)"
+        return 1
+    }
+
+    download_rom_url() {
+        local url="$1" target="$2" attempt
+        for attempt in 1 2 3; do
+            # Lan 1: -c de resume neu con file do dang. Cac lan sau: file da bi
+            # nghiem la hong (khong chi thieu byte) nen phai xoa va tai lai tu dau,
+            # vi resume tu mot central directory hong se ket thuc ngay lap tuc.
+            if [ "$attempt" -gt 1 ]; then
+                rm -f "$target"
+            fi
+
+            # -c: resume.
+            # --timeout/--connect-timeout/--max-tries: mac dinh aria2 khong co gioi
+            #     han tong, gap CDN tra cham la treo im lang khong bao gio ket thuc.
+            # --lowest-speed-limit: 10K chi bat dung truong hop chet han, --timeout=60
+            #     bat stall that su (CDN Xiaomi co luc cham nhung van tai duoc).
+            # --summary-interval=10: in tien do moi 10s de log CI thay no con chay.
+            aria2c -c --max-tries=20 --retry-wait=5 \
+                --timeout=60 --connect-timeout=30 --lowest-speed-limit=10K \
+                --summary-interval=10 --console-log-level=warn \
+                --max-download-limit=1024M --file-allocation=none -s10 -x10 -j10 \
+                --content-disposition -U "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
+                "${url}" || true
+
+            if rom_zip_ok "$target" && rom_sha256_ok "$target" "$rom_sha256_expected"; then
+                return 0
+            fi
+            warn "ROM: lan tai $attempt tu $url chua hop le - thu lai"
+        done
+        return 1
+    }
+
     # Ten file tren dia khac URL: --content-disposition lay ten tu header.
     # Phai tinh TRUOC vong lap, vi vong lap can biet dang kiem file nao.
     rom_file=$(basename "${baserom%%\?*}")
-    info "ROM: file đích ${rom_file}"
+    rom_mirrors_raw="${ROM_MIRROR_URLS:-}"
+    rom_sha256_expected="${ROM_SHA256:-}"
+    if [ -n "$rom_mirrors_raw" ]; then
+        info "ROM: mirrors bo sung da cau hinh (ROM_MIRROR_URLS)"
+    fi
+    if [ -n "$rom_sha256_expected" ]; then
+        info "ROM: se kiem tra SHA256 sau khi tai"
+    fi
+    info "ROM: file dich ${rom_file}"
 
-    for attempt in 1 2 3; do
-        # Lan 1: -c de resume neu con file do dang. Cac lan sau: file da bi
-        # nghiem la hong (khong chi thieu byte) nen phai xoa va tai lai tu dau,
-        # vi resume tu mot central directory hong se ket thuc ngay lap tuc.
-        if [ "$attempt" -gt 1 ]; then
+    rom_downloaded=0
+    # Thu URL chinh truoc
+    if download_rom_url "${baserom}" "$rom_file"; then
+        rom_downloaded=1
+    fi
+
+    # Neu that bai va co mirrors, thu lan luot mirrors (giu ten file dich de phu hop pipeline)
+    if [ "$rom_downloaded" -ne 1 ] && [ -n "$rom_mirrors_raw" ]; then
+        old_ifs="$IFS"
+        IFS=', '
+        for mirror in $rom_mirrors_raw; do
+            IFS="$old_ifs"
+            [ -z "$mirror" ] && continue
+            warn "ROM: thu mirror: $mirror"
             rm -f "$rom_file"
-        fi
-
-        # -c: resume.
-        # --timeout/--connect-timeout/--max-tries: mac dinh aria2 khong co gioi
-        #     han tong, gap CDN tra cham la treo im lang khong bao gio ket thuc.
-        # --lowest-speed-limit: TRUOC DAY LA 100K va no tu giet download. CDN
-        #     Xiaomi co luc tut ve ~55KB/s (log 05/11 01:51:46: "Too slow
-        #     Downloading speed: 55650 <= 102400"), aria2 huy CA 10 ket noi va
-        #     tra ERR du toc do trung binh van 91MiB/s. 10K chi bat dung truong
-        #     hop chet han, con --timeout=60 moi la thu bat stall that su.
-        # --summary-interval=10: in tien do moi 10s, de log CI thay no con chay.
-        aria2c -c --max-tries=20 --retry-wait=5 \
-            --timeout=60 --connect-timeout=30 --lowest-speed-limit=10K \
-            --summary-interval=10 --console-log-level=warn \
-            --max-download-limit=1024M --file-allocation=none -s10 -x10 -j10 --content-disposition -U "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "${baserom}" || true
-
-        if rom_zip_ok "$rom_file"; then
-            break
-        fi
-        warn "ROM: lần tải $attempt chưa xong hoặc file hỏng - thử lại"
-    done
+            if download_rom_url "$mirror" "$rom_file"; then
+                rom_downloaded=1
+                info "ROM: tai thanh cong tu mirror"
+                break
+            fi
+        done
+        IFS="$old_ifs"
+    fi
 
     baserom="$rom_file"
     if [ -f $work_dir/topaz-ota_full-OS3.0.2.0.WMGCNXM-user-16.0-b487e82659.zip ]; then
@@ -61,8 +118,8 @@ if [ ! -f "${baserom}" ] && [ "$(echo $baserom |grep http)" != "" ]; then
     elif [ -f $work_dir/munch-ota_full-OS2.0.215.0.VLMCNXM-user-15.0-7df6d5ee94.zip ]; then
         baserom="munch-ota_full-OS2.0.215.0.VLMCNXM-user-15.0-7df6d5ee94.zip"
         info "BASEROM: ${baserom}"
-    elif ! rom_zip_ok "${baserom}"; then
-        error "Download error! (thiếu hoặc hỏng: ${baserom})"
+    elif [ "$rom_downloaded" -ne 1 ] || ! rom_zip_ok "${baserom}"; then
+        error "Download error! (thieu, hong hoac sai checksum: ${baserom})"
         exit 1
     fi
 elif [ -f "${baserom}" ]; then
