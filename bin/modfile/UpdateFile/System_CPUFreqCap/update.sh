@@ -93,7 +93,7 @@ apply_cap_once() {
             echo "$target" > "$cpu/scaling_max_freq" 2>/dev/null && changed=$((changed+1))
         fi
     done
-    [ "$any" -eq 0 ] && log_msg "no cpufreq policy nodes found" || log_msg "applied percent=${p} changed=${changed}"
+    [ "$any" -eq 0 ] && log_msg "no cpufreq policy nodes found" || log_msg "applied percent=${p} changed=${changed} policies=${any}"
 }
 
 if [ "$PERCENT" -lt 85 ] 2>/dev/null; then
@@ -112,6 +112,12 @@ if [ "$INTERVAL" -gt 0 ]; then
         sleep "$INTERVAL"
         apply_cap_once
     done
+else
+    # interval=0: vẫn thử áp lại vài lần để tăng khả năng giữ sau khi HAL/thermal ghi đè lúc boot
+    sleep 30
+    apply_cap_once
+    sleep 60
+    apply_cap_once
 fi
 
 log_msg "done"

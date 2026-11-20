@@ -624,54 +624,9 @@ PY
 
     mods "Settings: drawable=$total  string=$strings_done"
 
-    # ---- Icon mục Toolbox ------------------------------------------------
-    # Dùng drawable riêng cho Toolbox để tránh ghi đè icon gốc của mục
-    # "Cài đặt bổ sung / Other advanced settings" (ic_other_advanced_settings)
-    # nếu ROM sử dụng chung drawable này.
-    local tb_icon="$SRC_DIR/ic_toolbox.xml"
-    if [ -f "$tb_icon" ]; then
-        local tb_n=0 tb_dir
-        while IFS= read -r tb_dir; do
-            [ -n "$tb_dir" ] || continue
-            if cp -f "$tb_icon" "$tb_dir/ic_erroros_toolbox.xml"; then
-                tb_n=$((tb_n + 1))
-            fi
-        done < <(find "$out/resources" -type d -path '*/res/drawable*' 2>/dev/null)
-        if [ "$tb_n" -gt 0 ]; then
-            mods "Settings: icon Toolbox -> ic_erroros_toolbox ($tb_n drawable dirs)"
-        else
-            warn "Settings: không tìm thấy thư mục drawable để thêm icon Toolbox"
-        fi
-    fi
-
-    # ---- Menu: Tích hợp Toolbox vào Cài đặt -> Mod ------------------------
-    local mod_ok=0
-    # Target của mục Toolbox do bin/ddevice/apply_mode.sh ghi vào config.env
-    # (root -> com.nvt.roottoolbox, kaorios -> com.kousei.kaorios). Truyền qua
-    # env để patch_settings_mod.py không phụ thuộc thư mục đang đứng.
-    if [ -f "$(pwd)/config.env" ]; then
-        export TOOLBOX_TARGET_PACKAGE="$(grep -m1 '^toolbox_target_package=' "$(pwd)/config.env" | cut -d= -f2 | tr -d ' \r\n')"
-        export TOOLBOX_TARGET_CLASS="$(grep -m1 '^toolbox_target_class=' "$(pwd)/config.env" | cut -d= -f2 | tr -d ' \r\n')"
-    fi
-    [ -z "$TOOLBOX_TARGET_PACKAGE" ] && TOOLBOX_TARGET_PACKAGE="com.nvt.roottoolbox"
-    [ -z "$TOOLBOX_TARGET_CLASS" ] && TOOLBOX_TARGET_CLASS="com.nvt.roottoolbox.MainActivity"
-    mods "Settings: Toolbox target = ${TOOLBOX_TARGET_PACKAGE}/${TOOLBOX_TARGET_CLASS}"
-    if [ -f "$SRC_DIR/patch_settings_mod.py" ]; then
-        if python3 "$SRC_DIR/patch_settings_mod.py" "$out"; then
-            mod_ok=1
-        else
-            warn "Settings: tích hợp mục Toolbox thất bại (patch_settings_mod.py)"
-            mod_ok=0
-        fi
-        # Xác nhận thực tế: có Intent/target package trong tài nguyên đã decode không
-        if [ "$mod_ok" -eq 1 ] && ! grep -R -q "$TOOLBOX_TARGET_PACKAGE" "$out/resources" 2>/dev/null; then
-            warn "Settings: không thấy target package '$TOOLBOX_TARGET_PACKAGE' trong resources sau patch -> coi như thất bại"
-            mod_ok=0
-        fi
-    fi
-
-    if [ "$total" -eq 0 ] && [ "$strings_done" -eq 0 ] && [ "$mod_ok" -eq 0 ]; then
-        warn "Settings: không thay đổi được asset, string lẫn mục Toolbox - giữ APK gốc"
+    # Theo yêu cầu: chỉ branding/logo + thông tin ROM trong Settings, không chèn mục Toolbox.
+    if [ "$total" -eq 0 ] && [ "$strings_done" -eq 0 ]; then
+        warn "Settings: không thay đổi được asset hay string - giữ APK gốc"
         return 1
     fi
 
@@ -696,8 +651,13 @@ PY
     fi
 
     # ---- rebuild ----------------------------------------------------------
+    try_rebuild_settings() {
+        rm -f "$work/new.apk"
+        $APKEDITOR b -f -i "$out" -o "$work/new.apk" > "$work/build.log" 2>&1 && [ -s "$work/new.apk" ]
+    }
+
     mods "Settings: Rebuild..."
-    if ! $APKEDITOR b -f -i "$out" -o "$work/new.apk" > "$work/build.log" 2>&1 || [ ! -s "$work/new.apk" ]; then
+    if ! try_rebuild_settings; then
         # Đổi đuôi .xml -> .png là thao tác ít gặp; nếu bộ biên dịch resource
         # của APKEditor từ chối thì quay lại logo vector để KHÔNG mất logo.
         if [ "$png_used" -gt 0 ] && [ -d "$work/logo_bak" ]; then
@@ -727,16 +687,15 @@ PY
             done
             png_used=0
             total=$fb
-            rm -f "$work/new.apk"
-            if ! $APKEDITOR b -f -i "$out" -o "$work/new.apk" > "$work/build.log" 2>&1 || [ ! -s "$work/new.apk" ]; then
+            if ! try_rebuild_settings; then
                 warn "Settings: Rebuild FAILED (cả PNG lẫn vector) - giữ APK gốc"
-                tail -n 5 "$work/build.log" 2>/dev/null
+                tail -n 8 "$work/build.log" 2>/dev/null
                 return 1
             fi
             mods "Settings: Rebuild lại bằng vector OK"
         else
             warn "Settings: Rebuild FAILED - giữ APK gốc"
-            tail -n 5 "$work/build.log" 2>/dev/null
+            tail -n 8 "$work/build.log" 2>/dev/null
             return 1
         fi
     fi
@@ -797,14 +756,23 @@ PY
 
 idx=0
 found=0
+patched=0
 while IFS= read -r apk; do
     [ -f "$apk" ] || continue
     found=$((found + 1))
     idx=$((idx + 1))
-    patch_settings_apk "$apk" "$idx"
+    if patch_settings_apk "$apk" "$idx"; then
+        patched=$((patched + 1))
+    else
+        warn "Settings: APK không được áp dụng patch (giữ nguyên gốc): ${apk#$MAIN_FOLDER/}"
+    fi
 done < <(find "$MAIN_FOLDER" -type f -name "Settings.apk" 2>/dev/null)
 
 [ "$found" -eq 0 ] && warn "Không tìm thấy Settings.apk trong images"
 
 rm -rf "$WORK_ROOT"
-mods "Error OS ROM Information Integration Done!"
+if [ "$found" -gt 0 ] && [ "$patched" -eq 0 ]; then
+    warn "Error OS ROM Information: KHÔNG áp dụng được vào Settings.apk (xem log ở trên)"
+else
+    mods "Error OS ROM Information Integration Done!"
+fi
