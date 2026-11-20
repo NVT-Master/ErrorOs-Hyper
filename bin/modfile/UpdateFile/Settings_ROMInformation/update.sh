@@ -653,12 +653,25 @@ PY
         export TOOLBOX_TARGET_PACKAGE="$(grep -m1 '^toolbox_target_package=' "$(pwd)/config.env" | cut -d= -f2 | tr -d ' \r\n')"
         export TOOLBOX_TARGET_CLASS="$(grep -m1 '^toolbox_target_class=' "$(pwd)/config.env" | cut -d= -f2 | tr -d ' \r\n')"
     fi
+    [ -z "$TOOLBOX_TARGET_PACKAGE" ] && TOOLBOX_TARGET_PACKAGE="com.nvt.roottoolbox"
+    [ -z "$TOOLBOX_TARGET_CLASS" ] && TOOLBOX_TARGET_CLASS="com.nvt.roottoolbox.MainActivity"
+    mods "Settings: Toolbox target = ${TOOLBOX_TARGET_PACKAGE}/${TOOLBOX_TARGET_CLASS}"
     if [ -f "$SRC_DIR/patch_settings_mod.py" ]; then
-        python3 "$SRC_DIR/patch_settings_mod.py" "$out" && mod_ok=1 || warn "Settings: tích hợp 'Mod' thất bại"
+        if python3 "$SRC_DIR/patch_settings_mod.py" "$out"; then
+            mod_ok=1
+        else
+            warn "Settings: tích hợp mục Toolbox thất bại (patch_settings_mod.py)"
+            mod_ok=0
+        fi
+        # Xác nhận thực tế: có Intent/target package trong tài nguyên đã decode không
+        if [ "$mod_ok" -eq 1 ] && ! grep -R -q "$TOOLBOX_TARGET_PACKAGE" "$out/resources" 2>/dev/null; then
+            warn "Settings: không thấy target package '$TOOLBOX_TARGET_PACKAGE' trong resources sau patch -> coi như thất bại"
+            mod_ok=0
+        fi
     fi
 
     if [ "$total" -eq 0 ] && [ "$strings_done" -eq 0 ] && [ "$mod_ok" -eq 0 ]; then
-        warn "Settings: không thay đổi được asset, string lẫn mục Mod - giữ APK gốc"
+        warn "Settings: không thay đổi được asset, string lẫn mục Toolbox - giữ APK gốc"
         return 1
     fi
 

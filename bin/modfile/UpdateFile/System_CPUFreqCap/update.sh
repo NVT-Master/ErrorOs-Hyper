@@ -22,6 +22,8 @@ if [ "$ENABLE" != "true" ]; then
     exit 0
 fi
 
+mods "CPUCap: experimental - may reduce peak performance and can delay push/FCM if set too low; keep fcm_boot_apply=true and test notifications"
+
 case "$PERCENT" in
     ''|*[!0-9]*) warn "CPUCap: invalid cpu_freq_cap_percent '$PERCENT' -> using 90"; PERCENT=90 ;;
 esac
@@ -94,9 +96,12 @@ apply_cap_once() {
     [ "$any" -eq 0 ] && log_msg "no cpufreq policy nodes found" || log_msg "applied percent=${p} changed=${changed}"
 }
 
+if [ "$PERCENT" -lt 85 ] 2>/dev/null; then
+    log_msg "warning: percent=${PERCENT} may delay background/push processing (FCM notifications)"
+fi
 log_msg "start percent=${PERCENT} interval=${INTERVAL}"
-# wait for thermal/perf services to settle, then apply
-sleep 20
+# wait for boot/thermal/GMS-FCM services to settle, then apply (later = safer for instant notifications)
+sleep 45
 apply_cap_once
 
 case "$INTERVAL" in

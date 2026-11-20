@@ -74,6 +74,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TELEGRAM_GROUP_ID: ${{ secrets.TELEGRAM_GROUP_ID }}
           TELEGRAM_TOPIC_ID: ${{ secrets.TELEGRAM_TOPIC_ID }}
+          TOOLBOX_MODE: ${{ inputs.toolbox_mode }}
         run: |
           set -euo pipefail
           chmod -R 777 . || true
@@ -85,6 +86,7 @@ jobs:
             -e TELEGRAM_GROUP_ID="$TELEGRAM_GROUP_ID" \
             -e TELEGRAM_TOPIC_ID="$TELEGRAM_TOPIC_ID" \
             -e GITHUB_REPOSITORY="${{ github.repository }}" \
+            -e TOOLBOX_MODE="$TOOLBOX_MODE" \
             -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" \
             -w "$GITHUB_WORKSPACE" \
             archlinux:latest \
@@ -99,6 +101,16 @@ jobs:
               if [ "$(id -u)" -eq 0 ]; then bash setup.sh; else sudo bash setup.sh; fi
               git config --global --add safe.directory "$PWD" || true
               git config --global --add safe.directory "*" || true
+              if [ -f config.env ]; then
+                mode="${TOOLBOX_MODE:-root}"
+                case "$mode" in root|kaorios) ;; *) mode=root ;; esac
+                if grep -q "^toolbox_mode=" config.env; then
+                  sed -i "s|^toolbox_mode=.*|toolbox_mode=${mode}|" config.env
+                else
+                  echo "toolbox_mode=${mode}" >> config.env
+                fi
+                echo "[ci] toolbox_mode=${mode}"
+              fi
               echo "[ci] Starting build..."
               bash build.sh "$INPUT_URL" "$GITHUB_REPOSITORY" "xiaomi" "iabi" "${TELEGRAM_BOT_TOKEN:-}" "${TELEGRAM_CHAT_ID:-}" "${TELEGRAM_GROUP_ID:-}" "${TELEGRAM_TOPIC_ID:-}" 2>&1 | tee -a build/build.log
             '

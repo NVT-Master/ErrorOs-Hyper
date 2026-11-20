@@ -50,6 +50,14 @@ def toolbox_target():
     return (pkg or DEFAULT_PKG), (cls or DEFAULT_CLS)
 
 
+def target_present(content, pkg, cls=None):
+    if not content or not pkg:
+        return False
+    if cls and (pkg in content and cls in content):
+        return True
+    return pkg in content
+
+
 def read_file(path):
     try:
         with open(path, "r", encoding="utf-8", errors="replace") as f:
@@ -78,7 +86,7 @@ def patch_settings_headers(file_path):
 
     pkg, cls = toolbox_target()
 
-    if pkg in content:
+    if target_present(content, pkg, cls):
         # Chỉ coi là "đã patch" khi header có android:id. Bản cũ thiếu id nên bị
         # MiuiSettings ẩn; gặp trường hợp đó thì gỡ ra rồi chèn lại bên dưới.
         has_id = re.search(
@@ -106,12 +114,19 @@ def patch_settings_headers(file_path):
     )
 
     pattern = re.compile(
-        r'(<header\b[^>]*?(?:android:id="@\+?id/my_device"|android:title="@string/my_device")[^>]*?(?:/>|>.*?</header>))',
+        r'(<header\b[^>]*?(?:android:id="@\+?id/my_device"|android:title="@string/my_device"|android:fragment="[^"]*(?:MyDevice|AboutPhone|DeviceInfo)[^"]*")[^>]*?(?:/>|>.*?</header>))',
         re.S
     )
     match = pattern.search(content)
     if not match:
-        print(f"  [WARN] {os.path.basename(file_path)}: Không tìm thấy header my_device")
+        # Fallback: một số bản dùng header khác tên nhưng vẫn là mục thiết bị/giới thiệu.
+        pattern = re.compile(
+            r'(<header\b[^>]*?(?:my_device|about_phone|about_device|device_info)[^>]*?(?:/>|>.*?</header>))',
+            re.I | re.S
+        )
+        match = pattern.search(content)
+    if not match:
+        print(f"  [WARN] {os.path.basename(file_path)}: Không tìm thấy anchor để chèn Toolbox")
         return False
 
     # android:id BẮT BUỘC phải có.
@@ -152,7 +167,7 @@ def patch_top_level_settings(file_path):
 
     pkg, cls = toolbox_target()
 
-    if pkg in content:
+    if target_present(content, pkg, cls):
         return True
 
     # Gỡ bỏ các thẻ cũ (nếu có)
@@ -186,12 +201,18 @@ def patch_top_level_settings(file_path):
     )
 
     pattern = re.compile(
-        r'(<(?:com\.android\.settings\.widget\.(?:HomepagePreference|RestrictedHomepagePreference)|Preference)\b[^>]*?android:key="top_level_about_(?:device|phone)"[^>]*?(?:/>|>.*?</[^>]+>))',
+        r'(<(?:com\.android\.settings\.widget\.(?:HomepagePreference|RestrictedHomepagePreference)|Preference)\b[^>]*?android:key="(?:top_level_about_(?:device|phone|settings)|top_level_my_device|my_device)"[^>]*?(?:/>|>.*?</[^>]+>))',
         re.S
     )
     match = pattern.search(content)
     if not match:
-        print(f"  [WARN] {os.path.basename(file_path)}: Không tìm thấy top_level_about_device")
+        pattern = re.compile(
+            r'(<(?:com\.android\.settings\.widget\.(?:HomepagePreference|RestrictedHomepagePreference)|Preference)\b[^>]*?(?:android:key="[^"]*(?:about|my_device)[^"]*"|android:fragment="[^"]*(?:MyDevice|AboutPhone|DeviceInfo)[^"]*")[^>]*?(?:/>|>.*?</[^>]+>))',
+            re.I | re.S
+        )
+        match = pattern.search(content)
+    if not match:
+        print(f"  [WARN] {os.path.basename(file_path)}: Không tìm thấy anchor để chèn Toolbox")
         return False
 
     mod_pref = (
@@ -223,18 +244,35 @@ def main():
         return 1
 
     print("Settings: Gắn mục Toolbox vào menu Settings...")
+    pkg, cls = toolbox_target()
+    print(f"Settings: Toolbox target -> {pkg}/{cls}")
+
+    patched_any = False
+    header_files = 0
+    top_files = 0
 
     # Duyệt và gắn vào settings_headers*.xml và top_level_settings*.xml
     for root, _, files in os.walk(out_dir):
         for fn in files:
+            full_p = os.path.join(root, fn)
             if fn.startswith("settings_headers") and fn.endswith(".xml"):
-                full_p = os.path.join(root, fn)
-                patch_settings_headers(full_p)
+                header_files += 1
+                if patch_settings_headers(full_p):
+                    patched_any = True
             elif fn.startswith("top_level_settings") and fn.endswith(".xml"):
-                full_p = os.path.join(root, fn)
-                patch_top_level_settings(full_p)
+                top_files += 1
+                if patch_top_level_settings(full_p):
+                    patched_any = True
 
-    print("Settings: Gắn mục Toolbox hoàn tất (an toàn, không can thiệp DEX).")
+    if header_files == 0 and top_files == 0:
+        print("Settings: [ERROR] Không tìm thấy settings_headers*.xml hoặc top_level_settings*.xml trong APK đã decode", file=sys.stderr)
+        return 2
+
+    if not patched_any:
+        print("Settings: [ERROR] Không chèn/xác nhận được mục Toolbox (anchor không khớp hoặc không ghi được)", file=sys.stderr)
+        return 3
+
+    print(f"Settings: Gắn mục Toolbox hoàn tất (headers={header_files}, top_level={top_files}).")
     return 0
 
 
